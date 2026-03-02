@@ -24,7 +24,7 @@ export interface DownloadResult {
  * - Presigned URL 검증
  * - 파일 스트림 및 Content-Type 반환
  */
-export async function downloadObject(
+export async function downloadFile(
   request: FastifyRequest<{ Querystring: PresignedQuery }>
 ): Promise<DownloadResult> {
   const { bucket, objectKey } = request.query;
@@ -44,7 +44,7 @@ export async function downloadObject(
  * - request body stream -> 파일시스템에 저장 → Secondary 복제
  * - Secondary 복제 실패 시 replication_queue에 넣기
  */
-export async function uploadObject(
+export async function uploadFile(
   request: FastifyRequest<{ Querystring: PresignedQuery }>,
   replicationQueue: ReplicationQueueRepository,
 ): Promise<FileInfo> {

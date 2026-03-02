@@ -5,8 +5,8 @@ import {
 } from "../services/response/apiResponse";
 import { HttpError } from "../utils/HttpError";
 import {
-  downloadObject,
-  uploadObject,
+  downloadFile,
+  uploadFile,
 } from "../services/objects/objectService";
 
 export interface PresignedQuery {
@@ -41,7 +41,7 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     Querystring: PresignedQuery;
   }>("/uploads/direct/:bucket/*", async function (request, reply) {
     try {
-      const { fileStream, contentType } = await downloadObject(request);
+      const { fileStream, contentType } = await downloadFile(request);
 
       reply.header("Content-Type", contentType);
       return reply.send(fileStream);
@@ -79,7 +79,7 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     Querystring: PresignedQuery;
   }>("/uploads/direct/:bucket/*", async function (request, reply) {
     try {
-      const fileInfo = await uploadObject(
+      const fileInfo = await uploadFile(
         request,
         fastify.replicationQueue,
       );
