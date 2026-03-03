@@ -1,7 +1,7 @@
 import fp from "fastify-plugin";
 import Database from "better-sqlite3";
 import { FastifyPluginCallback } from "fastify";
-import { CREATE_REPLICATION_QUEUE_TABLE } from "../db/schema";
+import { CREATE_REPLICATION_QUEUE_TABLE, CREATE_TUS_UPLOADS_TABLE } from "../db/schema";
 import {
   createReplicationQueueRepository,
   ReplicationQueueRepository,
@@ -31,7 +31,10 @@ const sqlitePlugin: FastifyPluginCallback = (fastify, _opts, done) => {
   db.pragma(`busy_timeout = ${BUSY_TIMEOUT_MS}`);
   db.pragma("temp_store = FILE");
 
-  if (DB_TABLE_INIT) db.exec(CREATE_REPLICATION_QUEUE_TABLE);
+  if (DB_TABLE_INIT) {
+    db.exec(CREATE_REPLICATION_QUEUE_TABLE);
+    db.exec(CREATE_TUS_UPLOADS_TABLE);
+  }
 
   const replicationQueue: ReplicationQueueRepository =
     createReplicationQueueRepository(db);
