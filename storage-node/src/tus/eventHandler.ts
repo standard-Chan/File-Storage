@@ -46,17 +46,7 @@ export function onUploadComplete(fastify: FastifyInstance) {
       );
     }
 
-    try {
-      await fastify.tusServer.datastore.remove(fileId);
-      fastify.log.info(
-        { fileId },
-        "[TUS-RESUMABLE] tus 업로드 세션 정리",
-      );
-    } catch (removeError) {
-      fastify.log.warn(
-        { fileId, error: removeError },
-        "[TUS-RESUMABLE] tus 업로드 세션 정리 실패",
-      );
-    }
+    fastify.tusSessionStore.delete(fileId);
+    fastify.log.info({ fileId }, "[TUS-RESUMABLE] 세션 레코드 삭제");
   };
 }
