@@ -9,10 +9,10 @@ import {
 } from "../storage/fileStorage";
 import { DEFAULT_CONTENT_TYPE } from "../../constants/contentTypes";
 import { validateReplicationBodyStream } from "../validation/replication";
-import { replicateToSecondary } from "../replication/replicateToSecondary";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
 import { classifyReplicationError } from "../replication/classifyError";
 import { PresignedQuery } from "../../routes/objects";
+import { replicateToSecondary } from "../replication/replicateToSecondary";
 
 export interface DownloadResult {
   fileStream: ReturnType<typeof getFileStream>;
@@ -76,7 +76,7 @@ export async function uploadFile(
 
     request.log.warn(
       { bucket, objectKey, errorType, errorMessage },
-      "Secondary 복제 실패 - replication_queue에 등록",
+      "Secondary 복제 요청이 전달되지 않았습니다. replication_queue에 등록",
     );
 
     replicationQueue.upsertOnFailure(

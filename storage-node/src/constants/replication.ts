@@ -25,5 +25,6 @@ export const RETRY_WORKER_BATCH_SIZE = 5;
 // ─── Secondary 노드 부하 임계값 ──────────────────────────────────────────────
 
 /** 아래 값 이상이면 Secondary 노드가 바쁜 것으로 간주하여 복제를 스킵 */
-export const SECONDARY_MAX_CONCURRENT_DISK_WRITES = 5;
-export const SECONDARY_MAX_CONCURRENT_DISK_READS = 10;
+export const SECONDARY_MAX_CONCURRENT_DISK_WRITES = 15;
+export const SECONDARY_MAX_CONCURRENT_DISK_READS = 20;
+export const SECONDARY_MAX_CONCURRENT_DISK_IO = 20

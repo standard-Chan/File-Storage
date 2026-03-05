@@ -13,7 +13,33 @@ import {
   REPLICATION_DEFAULT_TIMEOUT_MS,
   REPLICATION_ENDPOINT_PATH,
   REPLICATION_REQUEST_HEADER,
+  SECONDARY_METRICS_REQUEST_TIMEOUT_MS,
 } from "../../constants/replication";
+import { HEALTH_CHECK_PATH } from "../../constants/healthCheck";
+
+/**
+ * Secondary 노드의 /health 엔드포인트를 호출하여 서버 가동 여부 확인
+ * 응답이 없거나 오류 발생 시 false 반환 (복제 skip)
+ */
+export async function checkSecondaryHealth(
+  secondaryNodeIp: string,
+  log: FastifyBaseLogger,
+): Promise<boolean> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SECONDARY_METRICS_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${secondaryNodeIp}${HEALTH_CHECK_PATH}`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    log.warn({ secondaryNodeIp }, "Secondary 노드 헬스체크 실패");
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * 환경변수에서 복제 타임아웃(ms)을 읽어 반환

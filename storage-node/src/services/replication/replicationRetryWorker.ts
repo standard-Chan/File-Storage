@@ -1,11 +1,15 @@
 import { FastifyBaseLogger } from "fastify";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
-import { replicateToSecondary } from "./replicateToSecondary";
+import {
+  checkSecondaryHealth,
+  replicateToSecondary,
+} from "./replicateToSecondary";
 import { classifyReplicationError } from "./classifyError";
 import { validateSecondaryNodeIp } from "../validation/replication";
 import {
   RETRY_WORKER_BATCH_SIZE,
   RETRY_WORKER_POLL_INTERVAL_MS,
+  SECONDARY_MAX_CONCURRENT_DISK_IO,
   SECONDARY_MAX_CONCURRENT_DISK_READS,
   SECONDARY_MAX_CONCURRENT_DISK_WRITES,
   SECONDARY_METRICS_DISK_PATH,
@@ -35,14 +39,23 @@ async function isSecondaryNodeIdle(log: FastifyBaseLogger): Promise<boolean> {
   );
 
   try {
-    const response = await fetch(`${secondaryNodeIp}${SECONDARY_METRICS_DISK_PATH}`, {
-      signal: controller.signal,
-    });
+    const isHealthy = await checkSecondaryHealth(secondaryNodeIp, log);
+    if (!isHealthy) {
+      log.warn("Secondary 노드가 응답하지 않아 복제를 건너뜁니다");
+      return false;
+    }
+
+    const response = await fetch(
+      `${secondaryNodeIp}${SECONDARY_METRICS_DISK_PATH}`,
+      {
+        signal: controller.signal,
+      },
+    );
 
     if (!response.ok) {
       log.warn(
         { status: response.status },
-        "[retryWorker] metrics/disk 응답 실패 - 복제 스킵",
+        "[retryWorker] metrics/disk 응답 실패하여 - 복제 스킵합니다",
       );
       return false;
     }
@@ -50,7 +63,9 @@ async function isSecondaryNodeIdle(log: FastifyBaseLogger): Promise<boolean> {
     const metrics = (await response.json()) as DiskMetrics;
     const isIdle =
       metrics.activeDiskWrites < SECONDARY_MAX_CONCURRENT_DISK_WRITES &&
-      metrics.activeDiskReads < SECONDARY_MAX_CONCURRENT_DISK_READS;
+      metrics.activeDiskReads < SECONDARY_MAX_CONCURRENT_DISK_READS &&
+      metrics.activeDiskReads + metrics.activeDiskWrites <
+        SECONDARY_MAX_CONCURRENT_DISK_IO;
 
     if (!isIdle) {
       log.debug(
@@ -58,7 +73,7 @@ async function isSecondaryNodeIdle(log: FastifyBaseLogger): Promise<boolean> {
           activeDiskWrites: metrics.activeDiskWrites,
           activeDiskReads: metrics.activeDiskReads,
         },
-        "[retryWorker] Secondary 노드 작업량 초과 - 복제 스킵",
+        "[retryWorker] Secondary 노드 작업량이 초과하여, 복제 보류합니다",
       );
     }
 
@@ -86,7 +101,9 @@ async function retryFailedReplications(
   const idle = await isSecondaryNodeIdle(log);
   if (!idle) return;
 
-  const replicationObjects = replicationQueue.fetchRetryBatch(RETRY_WORKER_BATCH_SIZE);
+  const replicationObjects = replicationQueue.fetchRetryBatch(
+    RETRY_WORKER_BATCH_SIZE,
+  );
 
   if (replicationObjects.length === 0) return;
 
@@ -160,7 +177,10 @@ export function startReplicationRetryWorker(
   }, RETRY_WORKER_POLL_INTERVAL_MS);
 
   log.info(
-    { pollIntervalMs: RETRY_WORKER_POLL_INTERVAL_MS, batchSize: RETRY_WORKER_BATCH_SIZE },
+    {
+      pollIntervalMs: RETRY_WORKER_POLL_INTERVAL_MS,
+      batchSize: RETRY_WORKER_BATCH_SIZE,
+    },
     "[retryWorker] 시작",
   );
 }
