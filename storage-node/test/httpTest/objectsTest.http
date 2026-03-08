@@ -1,6 +1,12 @@
 
 @controlPlaneUrl = http://localhost:8080
 @storageNodeUrl = http://localhost:3000
+# @storageNodeUrl = http://standard-object-storage.duckdns.org:3000
+
+### 현재 DISK 쓰기 작업의 개수
+# @name metrics/disk
+GET {{storageNodeUrl}}/metrics/disk
+Content-Type: application/json
 
 ### 1. Presigned URL 발급 (PUT 전용)
 
@@ -10,23 +16,19 @@ POST {{controlPlaneUrl}}/api/storage/presigned-url
 Content-Type: application/json
 
 {
-  "bucket": "photos",
-  "key": "picture/a/한글파일(1).jpg"
+  "bucket": "버킷1",
+  "objectKey": "abc/한글파일(1).jpg",
+  "fileSize": 12345623231
 }
 
 ### 2. 발급받은 URL로 파일 업로드
 
 ### 2-1. 사진 파일 업로드 (위에서 발급받은 URL 사용)
 ### 주의: 아래 URL을 위에서 받은 presignedUrl로 교체하세요
-PUT http://localhost:3000/objects/photos/picture/a/%ED%95%9C%EA%B8%80%ED%8C%8C%EC%9D%BC(1).jpg?bucket=photos&key=picture/a/한글파일(1).jpg&method=PUT&exp=1771493547&signature=ey0Q4GoNsAMgij-3nJeiO9QsNiBWSsZWGcvKamgjOwo
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+PUT http://localhost:3000/objects/direct/%EB%B2%84%ED%82%B71/abc/%ED%95%9C%EA%B8%80%ED%8C%8C%EC%9D%BC(1).jpg?bucket=버킷1&objectKey=abc/한글파일(1).jpg&method=POST&exp=1772680035&fileSize=12345623231&signature=HCw8N4EPYeK3sv24xTOMrT2AR2vFH6erqPIQ0-1D_MY
+Content-Type: application/octet-stream
 
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="file"; filename="sample.jpg"
-Content-Type: image/jpeg
-
-< ./test-files/sample.jpg
-------WebKitFormBoundary7MA4YWxkTrZu0gW--
+< ./test-files/10mb.bin
 
 ###
 ### 성공 응답 예시:

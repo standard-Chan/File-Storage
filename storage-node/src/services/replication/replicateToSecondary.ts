@@ -26,7 +26,10 @@ export async function checkSecondaryHealth(
   log: FastifyBaseLogger,
 ): Promise<boolean> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), SECONDARY_METRICS_REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    SECONDARY_METRICS_REQUEST_TIMEOUT_MS,
+  );
   try {
     const response = await fetch(`${secondaryNodeIp}${HEALTH_CHECK_PATH}`, {
       method: "GET",
@@ -49,7 +52,9 @@ function getTimeoutMs(): number {
   const limitTime = process.env.REPLICATION_TIMEOUT_MS;
   if (!limitTime) return REPLICATION_DEFAULT_TIMEOUT_MS;
   const parsed = parseInt(limitTime, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : REPLICATION_DEFAULT_TIMEOUT_MS;
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : REPLICATION_DEFAULT_TIMEOUT_MS;
 }
 
 /**
@@ -69,6 +74,12 @@ export async function replicateToSecondary(
   log: FastifyBaseLogger,
 ): Promise<void> {
   const secondaryNodeIp = validateSecondaryNodeIp();
+
+  const isHealthy = await checkSecondaryHealth(secondaryNodeIp, log);
+  if (!isHealthy) {
+    log.warn("Secondary 노드가 응답하지 않아 복제를 건너뜁니다");
+    return;
+  }
 
   const url =
     `${secondaryNodeIp}${REPLICATION_ENDPOINT_PATH}` +
@@ -97,7 +108,10 @@ export async function replicateToSecondary(
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      log.error({ bucket, objectKey, status: response.status, body }, "Secondary 복제 실패");
+      log.error(
+        { bucket, objectKey, status: response.status, body },
+        "Secondary 복제 실패",
+      );
       throw new HttpError(
         response.status,
         `Secondary 복제 실패 (HTTP ${response.status})`,
@@ -108,7 +122,10 @@ export async function replicateToSecondary(
     if (error instanceof HttpError) throw error;
 
     if ((error as { name?: string })?.name === "AbortError") {
-      log.error({ bucket, objectKey }, `Secondary 복제 타임아웃 (${getTimeoutMs()}ms 초과)`);
+      log.error(
+        { bucket, objectKey },
+        `Secondary 복제 타임아웃 (${getTimeoutMs()}ms 초과)`,
+      );
       // 504 Gateway Timeout: 우리 쪽 AbortController가 중단한 경우
       throw new HttpError(
         HTTP_STATUS_GATEWAY_TIMEOUT,
@@ -116,11 +133,18 @@ export async function replicateToSecondary(
       );
     }
 
-    log.error({ error, bucket, objectKey }, "Secondary 복제 중 네트워크 오류가 발생했습니다");
+    log.error(
+      { error, bucket, objectKey },
+      "Secondary 복제 중 네트워크 오류가 발생했습니다",
+    );
     // 502 Bad Gateway: fetch 자체가 실패한 경우 (연결 거부, DNS 실패 등)
-    throw new HttpError(HTTP_STATUS_BAD_GATEWAY, "Secondary 복제 중 네트워크 오류가 발생했습니다", {
-      error: error instanceof Error ? error.message : "알 수 없는 오류",
-    });
+    throw new HttpError(
+      HTTP_STATUS_BAD_GATEWAY,
+      "Secondary 복제 중 네트워크 오류가 발생했습니다",
+      {
+        error: error instanceof Error ? error.message : "알 수 없는 오류",
+      },
+    );
   } finally {
     clearTimeout(timeoutId);
   }

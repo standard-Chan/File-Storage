@@ -7,6 +7,8 @@
 - `upload.js`: 단일 파일 업로드 테스트
 - `load-test.js`: 동시 업로드 부하 테스트 (Node.js)
 - `k6-load-test.js`: k6 부하 테스트 스크립트 ⭐ **추천**
+- `k6-tus-resume-upload.js`: k6 TUS 재개 업로드 단독 테스트
+- `k6-resumable-comparison.js`: k6 **Restart vs Resume 비교 테스트** ⭐ **Resumable 도입 효과 수치화**
 - `run-k6-test.ps1`: k6 테스트 실행 헬퍼 스크립트 (Windows)
 - `run-k6-test.sh`: k6 테스트 실행 헬퍼 스크립트 (Linux/macOS)
 - `K6_LOAD_TEST.md`: k6 부하 테스트 상세 가이드
@@ -128,7 +130,92 @@ k6 run --out json=results.json k6-load-test.js
 
 📘 **상세한 사용법은 [K6_LOAD_TEST.md](./K6_LOAD_TEST.md)를 참고하세요.**
 
-### 3. Node.js 동시 업로드 부하 테스트 (`load-test.js`)
+---
+
+### 3. Resumable Upload 도입 효과 비교 테스트 (`k6-resumable-comparison.js`) ⭐
+
+TUS 프로토콜 기반 Resumable 업로드의 도입 효과를 수치로 검증한다.  
+**동일한 중단 지점(INTERRUPT_MB)에서 두 가지 복구 전략의 소요 시간을 측정·비교**한다.
+
+| 구분 | 시나리오 A: Restart | 시나리오 B: Resume |
+|------|--------------------|--------------------|
+| 중단 후 처리 | 기존 세션 폐기, 처음부터 재전송 | 기존 세션 유지, 중단 지점부터 재개 |
+| 복구 시 전송량 | 전체 파일 크기 | 파일 크기 − 중단 지점 |
+| TUS 사용 여부 | ✗ (일반 재업로드) | ✓ (HEAD → PATCH 재개) |
+
+#### API 흐름 (두 시나리오 공통)
+
+```
+[Control Plane]
+POST /api/storage/presigned-url
+  ← { presignedUrl }
+
+[Storage Node — TUS 세션 생성]
+POST {presignedUrl}   (Tus-Resumable, Upload-Length 헤더 포함)
+  ← 201 Created, Location: //host/tus/objects//{bucket}/{key}
+
+[Storage Node — 청크 전송]
+PATCH {Location URL}  (Upload-Offset, Content-Type: application/offset+octet-stream)
+  ← 204 No Content
+
+[Resume 전용: 오프셋 확인]
+HEAD {Location URL}   (Tus-Resumable: 1.0.0)
+  ← 200, Upload-Offset: {bytes}
+```
+
+#### 실행 방법
+
+```bash
+# 기본 실행 (1GB 파일, 300MB 지점에서 중단)
+k6 run k6-resumable-comparison.js
+
+# 중단 지점·청크 크기 조정
+k6 run \
+  --env INTERRUPT_MB=300 \
+  --env CHUNK_MB=100 \
+  --env BUCKET=test_bucket \
+  --env CONTROL_PLANE_URL=http://localhost:8080 \
+  --env STORAGE_NODE_URL=http://localhost:3000 \
+  k6-resumable-comparison.js
+```
+
+> **주의**: 두 시나리오는 순차 실행된다.  
+> 기본 `startTime`은 `resume_scenario`가 `90m` 후 시작하도록 설정되어 있다.  
+> 파일 크기나 네트워크 속도에 따라 `options.scenarios.resume_scenario.startTime` 값을 조정해야 할 수 있다.
+
+#### 출력 예시
+
+```
+════════════════════════════════════════════════════════════
+  Resumable Upload 도입 효과 비교 리포트
+════════════════════════════════════════════════════════════
+
+  [측정 조건]
+  · 파일 크기       : 1.00 GB
+  · 청크 크기       : 100 MB
+  · 중단 지점       : 300 MB
+  · 재시작 시 추가  : 1024 MB (전체 재전송)
+  · 재개 시 추가    : 724 MB (나머지만 전송)
+
+────────────────────────────────────────────────────────────
+  항목                       A: Restart      B: Resume
+────────────────────────────────────────────────────────────
+  복구 소요 시간 (초)              320.5           231.2
+  전체 소요 시간 (초)              417.3           328.0
+  총 전송량 (MB)                  1324            1024
+────────────────────────────────────────────────────────────
+
+  [도입 효과]
+  · 복구 시간 절감    : 89.3 초  (27.9% 단축)
+  · 불필요 재전송 제거: 300 MB 절약
+  · 전송량 감소율     : 22.7%
+```
+
+결과는 `summary-comparison.json` 에도 저장된다.
+
+---
+
+### 4. Node.js 동시 업로드 부하 테스트 (`load-test.js`)
 
 여러 파일을 동시에 업로드하여 시스템 성능을 테스트합니다.
 

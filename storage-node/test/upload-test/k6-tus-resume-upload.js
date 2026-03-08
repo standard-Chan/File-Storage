@@ -25,13 +25,13 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
  *
  * 옵션:
  *   --env STORAGE_NODE_URL : Storage Node URL           (기본값: http://localhost:3000)
- *   --env CHUNK_MB         : 청크 크기(MB)              (기본값: 100)
+ *   --env CHUNK_MB         : 청크 크기(MB)              (기본값: 5)
  *   --env INTERRUPT_MB     : 중단 지점(MB, 청크 단위)   (기본값: 300)
  */
 
 // ── 환경 설정 ──────────────────────────────────────────────────────────────────
 const STORAGE_NODE_URL = __ENV.STORAGE_NODE_URL || 'http://localhost:3000';
-const CHUNK_MB         = parseInt(__ENV.CHUNK_MB      || '100', 10);
+const CHUNK_MB         = parseInt(__ENV.CHUNK_MB      || '5', 10);
 const INTERRUPT_MB     = parseInt(__ENV.INTERRUPT_MB  || '300', 10);
 const CHUNK_SIZE       = CHUNK_MB    * 1024 * 1024;
 const INTERRUPT_SIZE   = INTERRUPT_MB * 1024 * 1024;

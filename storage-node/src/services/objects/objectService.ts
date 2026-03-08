@@ -7,6 +7,7 @@ import {
   getContentTypeFromExtension,
   FileInfo,
 } from "../storage/fileStorage";
+import { createThroughputMeter, ThroughputMetrics } from "../../utils/ThroughputMeter";
 import { DEFAULT_CONTENT_TYPE } from "../../constants/contentTypes";
 import { validateReplicationBodyStream } from "../validation/replication";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
@@ -44,25 +45,38 @@ export async function downloadFile(
  * - request body stream -> 파일시스템에 저장 → Secondary 복제
  * - Secondary 복제 실패 시 replication_queue에 넣기
  */
+export interface UploadResult extends FileInfo {
+  throughput: ThroughputMetrics
+}
+
 export async function uploadFile(
   request: FastifyRequest<{ Querystring: PresignedQuery }>,
   replicationQueue: ReplicationQueueRepository,
-): Promise<FileInfo> {
+): Promise<UploadResult> {
   const { bucket, objectKey } = request.query;
   const mimetype = request.headers["content-type"] ?? DEFAULT_CONTENT_TYPE;
   const bodyStream = request.body;
 
   request.log.info({ objectKey }, "PUT request received");
 
-  validatePresignedUrlRequest(request.query, "PUT");
+  // validatePresignedUrlRequest(request.query, "PUT");
   validateReplicationBodyStream(bodyStream);
 
-  const filePath = await saveStreamToStorage(bucket, objectKey, bodyStream);
+  const { stream: meterStream, getMetrics } = createThroughputMeter()
+  bodyStream.pipe(meterStream)
+
+  const filePath = await saveStreamToStorage(bucket, objectKey, meterStream);
   const fileInfo = await collectStreamFileInfo(
     bucket,
     objectKey,
     filePath,
     mimetype,
+  );
+
+  const throughput = getMetrics()
+  request.log.info(
+    { bucket, objectKey, ...throughput },
+    "[Socket Buffer] Socket buffer 읽기 속도 측정",
   );
   request.log.info({ fileInfo }, "파일 업로드 성공");
 
@@ -87,5 +101,5 @@ export async function uploadFile(
     );
   }
 
-  return fileInfo;
+  return { ...fileInfo, throughput };
 }

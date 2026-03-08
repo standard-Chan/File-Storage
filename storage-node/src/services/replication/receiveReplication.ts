@@ -34,10 +34,8 @@ export async function receiveReplication(
 
   validateReplicationHeader(replicationHeader);
   validateReplicationParams(bucket, objectKey);
-
-  request.log.info({ bucket, objectKey }, "Replication request received");
-
   validateReplicationBodyStream(bodyStream);
+  request.log.info({ bucket, objectKey }, "[Replication] request received");
 
   const mimetype = contentType ?? DEFAULT_CONTENT_TYPE;
 
@@ -54,7 +52,7 @@ export async function receiveReplication(
     mimetype,
   );
 
-  request.log.info({ fileInfo }, "파일 복제 완료");
+  request.log.info({ fileInfo }, "[Replication] 파일 복제를 완료하였습니다");
 
   return fileInfo;
 }

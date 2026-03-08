@@ -11,10 +11,10 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
  *  --vus = 인원수
  *  --duration 지속 시간
  *  --out experimental-prometheus-rw=http://localhost:9090/api/v1/write : 프로메테우스로 전달 
- *   k6 run --vus 100 --duration 30s --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
+ *   k6 run --vus 10 --duration 1m --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
  *   k6 run --vus 100 --duration 1m --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
- *   k6 run --vus 100 --duration 2m --env BUCKET=my-bucket k6-load-test.js
- * k6 run --vus 1000 --duration 10s --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
+ *  k6 run --vus 100 --duration 1m --env BUCKET=my-bucket k6-load-test.js
+ * k6 run --vus 200 --duration 1m --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
  * 
  * 옵션:
  *   --vus: 동시 가상 사용자 수 (기본값: 10)
@@ -25,13 +25,17 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
 // 환경 설정
 const CONTROL_PLANE_URL = __ENV.CONTROL_PLANE_URL || 'http://localhost:8080';
+const STORAGE_NODE_URL = __ENV.STORAGE_NODE_URL || 'http://localhost:3000';
 const BUCKET = __ENV.BUCKET || 'bucket1';
 
 // 파일 크기 정의 및 파일 로드 (바이트)
 // init context에서 로드되어 모든 VU가 공유 (메모리 효율적)
 const FILE_SIZES = [
-  { label: '1MB', size: 1 * 1024 * 1024, data: open('./test-files/1MB.bin', 'b') },
-  { label: '10MB', size: 10 * 1024 * 1024, data: open('./test-files/10MB.bin', 'b') },
+  // { label: '10KB', size: 10 * 1024, data: open('./test-files/10KB.bin', 'b') },
+  // { label: '100KB', size: 100 * 1024, data: open('./test-files/100KB.bin', 'b') },
+  // { label: '1MB', size: 1 * 1024 * 1024, data: open('./test-files/1MB.bin', 'b') },
+  { label: '5MB', size: 5 * 1024 * 1024, data: open('./test-files/5MB.bin', 'b') },
+  // { label: '10MB', size: 10 * 1024 * 1024, data: open('./test-files/10MB.bin', 'b') },
   // { label: '100MB', size: 100 * 1024 * 1024, data: open('./test-files/100MB.bin', 'b') },
   // { label: '1GB', size: 1 * 1024 * 1024 * 1024, data: open('./test-files/1GB.bin', 'b') },
 ];
@@ -68,10 +72,11 @@ export const options = {
 /**
  * Presigned URL 발급
  */
-function getPresignedUrl(bucket, objectKey) {
+function getPresignedUrl(bucket, objectKey, fileSize) {
   const payload = JSON.stringify({
     bucket: bucket,
     objectKey: objectKey,
+    fileSize: fileSize,
   });
 
   const response = http.post(
@@ -103,27 +108,27 @@ function getPresignedUrl(bucket, objectKey) {
   }
 
   const data = JSON.parse(response.body);
-  return data.presignedUrl;
+  // presigned URL의 도메인을 로컬 Storage Node URL로 교체
+  const presignedUrl = data.presignedUrl.replace(/^https?:\/\/[^/]+/, STORAGE_NODE_URL);
+  return presignedUrl;
 }
 
 /**
  * 파일 업로드
  */
 function uploadFile(presignedUrl, fileData, fileName, fileSize) {
-  // k6의 http.file()을 사용하여 바이너리 파일을 올바르게 전송
-  const formData = {
-    file: http.file(fileData, fileName, 'application/octet-stream'),
-  };
-
   const response = http.put(
     presignedUrl,
-    formData,
+    fileData,
     {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+      },
       tags: { 
         name: 'upload_file',
         file_size: fileSizeLabel(fileSize),
       },
-      timeout: '60s', // 큰 파일 업로드를 위한 타임아웃
+      timeout: '100s', // 큰 파일 업로드를 위한 타임아웃
     }
   );
 
@@ -155,7 +160,7 @@ export default function () {
   
   // 고유한 objectKey 생성
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(7);
+  const random = Math.random().toString(36).substring(20);
   const vuId = __VU; // Virtual User ID
   const iterationId = __ITER; // Iteration ID
   const objectKey = `k6-load-test/vu${vuId}/${timestamp}-iter${iterationId}-${random}.bin`;
@@ -163,7 +168,7 @@ export default function () {
   console.log(`[VU ${vuId}] 업로드 시작: ${selectedFile.label}, key=${objectKey}`);
   
   // 1. Presigned URL 발급
-  const presignedUrl = getPresignedUrl(BUCKET, objectKey);
+  const presignedUrl = getPresignedUrl(BUCKET, objectKey, selectedFile.size);
   
   if (!presignedUrl) {
     console.error(`[VU ${vuId}] Presigned URL 발급 실패, 업로드 중단`);
