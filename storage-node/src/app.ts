@@ -3,9 +3,9 @@ import { join } from "node:path";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
 import {
-  startReplicationRetryWorker,
-  stopReplicationRetryWorker,
-} from "./services/replication/replicationRetryWorker";
+  startReplicationWorker,
+  stopReplicationWorker,
+} from "./services/replication/replicationWorker";
 
 dotenv.config();
 export interface AppOptions
@@ -34,12 +34,12 @@ const app: FastifyPluginAsync<AppOptions> = async (
   // Primary 노드만 replication retry worker 실행
   if (process.env.ROLE === "primary") {
     fastify.addHook("onReady", function (done) {
-      startReplicationRetryWorker(fastify.replicationQueue, fastify.log);
+      startReplicationWorker(fastify.replicationQueue, fastify.log);
       done();
     });
 
     fastify.addHook("onClose", function (_instance, done) {
-      stopReplicationRetryWorker(fastify.log);
+      stopReplicationWorker(fastify.log);
       done();
     });
   } else {

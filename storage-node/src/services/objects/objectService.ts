@@ -10,9 +10,7 @@ import {
 import { DEFAULT_CONTENT_TYPE } from "../../constants/contentTypes";
 import { validateReplicationBodyStream } from "../validation/replication";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
-import { classifyReplicationError } from "../replication/classifyError";
 import { PresignedQuery } from "../../routes/objects";
-import { replicateToSecondary } from "../replication/replicateToSecondary";
 
 export interface DownloadResult {
   fileStream: ReturnType<typeof getFileStream>;
@@ -41,8 +39,8 @@ export async function downloadFile(
 /**
  * 파일 업로드 서비스 (Raw Stream 방식)
  * - Presigned URL 검증
- * - request body stream -> 파일시스템에 저장 → Secondary 복제
- * - Secondary 복제 실패 시 replication_queue에 넣기
+ * - request body stream -> 파일시스템에 저장
+ * - replication_queue TABLE에 복제 정보 등록
  */
 export async function uploadFile(
   request: FastifyRequest<{ Querystring: PresignedQuery }>,
@@ -66,26 +64,8 @@ export async function uploadFile(
   );
   request.log.info({ fileInfo }, "파일 업로드 성공");
 
-  try {
-    replicateToSecondary(bucket, objectKey, request.log);
-    request.log.info({ bucket, objectKey }, "Secondary-Node 복제 완료");
-  } catch (error) {
-    const errorType = classifyReplicationError(error);
-    const errorMessage =
-      error instanceof Error ? error.message : "알 수 없는 오류";
-
-    request.log.warn(
-      { bucket, objectKey, errorType, errorMessage },
-      "Secondary 복제 요청이 전달되지 않았습니다. replication_queue에 등록",
-    );
-
-    replicationQueue.upsertOnFailure(
-      bucket,
-      objectKey,
-      errorType,
-      errorMessage,
-    );
-  }
+  replicationQueue.registerReplicationTask(bucket, objectKey);
+  request.log.info({ bucket, objectKey }, "replication_queue에 복제 등록 완료");
 
   return fileInfo;
 }

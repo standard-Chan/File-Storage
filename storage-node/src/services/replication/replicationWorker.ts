@@ -149,13 +149,13 @@ async function retryFailedReplications(
 }
 
 /**
- * Replication Retry Worker 시작.
+ * Replication Worker 시작.
  *
  * - POLL_INTERVAL(1초)마다 replication_queue를 polling
  * - inFlight 플래그로 이전 poll이 끝나기 전 다음 poll 진입을 방지
  * - 앱 시작 시 단 한 번만 호출해야 한다
  */
-export function startReplicationRetryWorker(
+export function startReplicationWorker(
   replicationQueue: ReplicationQueueRepository,
   log: FastifyBaseLogger,
 ): void {
@@ -186,10 +186,10 @@ export function startReplicationRetryWorker(
 }
 
 /**
- * Replication Retry Worker 중단.
+ * Replication Worker 중단.
  * 앱 종료(onClose) 훅에서 호출한다.
  */
-export function stopReplicationRetryWorker(log: FastifyBaseLogger): void {
+export function stopReplicationWorker(log: FastifyBaseLogger): void {
   if (intervalId === null) return;
 
   clearInterval(intervalId);

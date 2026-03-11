@@ -22,6 +22,13 @@ export interface ReplicationQueueRow {
 
 export interface ReplicationQueueRepository {
   /**
+   * 업로드 직후 복제 대기 등록.
+   * - row 없으면 INSERT (retryCount = 0, nextRetryAt = now, 에러 정보 없음)
+   * - row 있으면 (재업로드 등) retryCount 초기화, 즉시 재시도 가능 상태로 리셋
+   */
+  registerReplicationTask(bucket: string, objectKey: string): void;
+
+  /**
    * 업로드 경로에서 복제 실패 시 호출.
    * - row 없으면 INSERT (retryCount = 0)
    * - row 있으면 retryCount++, nextRetryAt 갱신
@@ -73,6 +80,22 @@ function calcNextRetryTime(retryCount: number): string {
 export function createReplicationQueueRepository(
   db: InstanceType<typeof Database>,
 ): ReplicationQueueRepository {
+  const enqueueInitialStmt = db.prepare(`
+    INSERT INTO replication_queue
+      (bucket, objectKey, firstAttemptAt, lastTriedAt, retryCount, nextRetryAt,
+       status, lastErrorType, lastErrorMessage)
+    VALUES
+      (@bucket, @objectKey, @now, NULL, 0, @now,
+       'RETRYABLE', NULL, NULL)
+    ON CONFLICT(bucket, objectKey) DO UPDATE SET
+      retryCount       = 0,
+      lastTriedAt      = NULL,
+      nextRetryAt      = @now,
+      status           = 'RETRYABLE',
+      lastErrorType    = NULL,
+      lastErrorMessage = NULL
+  `);
+
   const upsertStmt = db.prepare(`
     INSERT INTO replication_queue
       (bucket, objectKey, firstAttemptAt, lastTriedAt, retryCount, nextRetryAt,
@@ -129,6 +152,10 @@ export function createReplicationQueueRepository(
   `);
 
   return {
+    registerReplicationTask(bucket, objectKey) {
+      enqueueInitialStmt.run({ bucket, objectKey, now: nowIso() });
+    },
+
     upsertOnFailure(bucket, objectKey, errorType, errorMessage) {
       // 기존 row가 있으면 retryCount+1 회차, 없으면 0 회차(첫 실패)
       const existing = getRetryCountStmt.get({ bucket, objectKey }) as
