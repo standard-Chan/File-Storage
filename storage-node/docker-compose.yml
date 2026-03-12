@@ -17,11 +17,6 @@ services:
       - /storage:/app/uploads
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
