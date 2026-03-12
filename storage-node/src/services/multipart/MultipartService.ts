@@ -81,6 +81,8 @@ export class MultipartService {
     await initMultipartUploadStorage(uploadId);
     this.sessionStore.set(uploadId, session);
 
+    request.log.info({ uploadId, bucket, objectKey }, "멀티파트 업로드 시작");
+
     return {
       uploadId,
       expiresAt: new Date(expiresAt).toISOString(),
@@ -98,11 +100,14 @@ export class MultipartService {
 
     const session = this.sessionStore.getActiveSession(uploadId);
     if (session.status === "COMPLETING") {
+      request.log.warn({ uploadId }, "파트 업로드 거부: complete 처리 중");
       throw new HttpError(409, "complete 처리 중에는 part 업로드를 할 수 없습니다");
     }
 
     const partNumber = parsePartNumber(rawPartNumber);
     const { size, etag } = await saveMultipartPart(uploadId, partNumber, stream);
+
+    request.log.info({ uploadId, partNumber, size }, "파트 업로드 완료");
 
     return { uploadId, partNumber, size, etag };
   }
@@ -114,6 +119,7 @@ export class MultipartService {
 
     const session = this.sessionStore.getActiveSession(uploadId);
     if (session.status === "COMPLETING") {
+      request.log.warn({ uploadId }, "complete 요청 거부: 이미 처리 중");
       throw new HttpError(409, "이미 complete 처리 중입니다");
     }
 
@@ -135,11 +141,14 @@ export class MultipartService {
       await removeMultipartUploadStorage(uploadId);
       this.sessionStore.delete(uploadId);
 
+      request.log.info({ uploadId, partCount: parts.length }, "멀티파트 파일 업로드 및 병합 완료");
+
       return {
         fileInfo,
         partCount: parts.length,
       };
     } catch (error) {
+      request.log.error({ uploadId, error }, "멀티파트 complete 실패, 상태 롤백");
       session.status = "INITIATED";
       throw error;
     }
@@ -154,6 +163,8 @@ export class MultipartService {
 
     await removeMultipartUploadStorage(uploadId);
     this.sessionStore.delete(uploadId);
+
+    request.log.info({ uploadId }, "멀티파트 업로드 취소");
 
     return { uploadId };
   }
