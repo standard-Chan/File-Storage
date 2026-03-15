@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: storage-node
+    mem_limit: 2g
     ports:
       - "3000:3000"
     env_file:
