@@ -45,6 +45,7 @@ export async function receiveReplication(
     bucket,
     objectKey,
     bodyStream,
+    request.log,
   );
 
   const fileInfo = await collectStreamFileInfo(

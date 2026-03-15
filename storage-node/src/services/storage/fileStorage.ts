@@ -4,6 +4,7 @@ import fs from 'fs'
 import { Readable, finished } from 'stream'
 import { pipeline } from 'stream/promises'
 import { MultipartFile } from '@fastify/multipart'
+import { FastifyBaseLogger } from 'fastify'
 import crypto from 'crypto'
 import { HttpError } from '../../utils/HttpError'
 import { CONTENT_TYPE_MAP, DEFAULT_CONTENT_TYPE } from '../../constants/contentTypes'
@@ -92,10 +93,11 @@ export async function collectFileInfo(
 export async function saveStreamToStorage(
   bucket: string,
   objectKey: string,
-  stream: Readable
+  stream: Readable,
+  log: FastifyBaseLogger,
 ): Promise<string> {
   // Dirty page 기반 throttle 적용
-  await throttleIfNeeded()
+  await throttleIfNeeded(log)
 
   const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
   const fileDir = path.dirname(filePath)

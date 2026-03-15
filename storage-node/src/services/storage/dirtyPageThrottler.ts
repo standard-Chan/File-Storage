@@ -1,4 +1,5 @@
 import { promises as fsPromises } from "fs";
+import { FastifyBaseLogger } from "fastify";
 
 /**
  * Dirty page 기반 디스크 쓰기 throttle
@@ -93,7 +94,7 @@ async function getDirtyPageSizeCached(): Promise<number> {
 /**
  * Dirty page가 threshold 이상이 될 때까지 대기
  */
-async function waitForDirtyPageDecrease(): Promise<void> {
+async function waitForDirtyPageDecrease(log: FastifyBaseLogger): Promise<void> {
   let attempts = 0;
   const maxAttempts = 60000 / WAIT_POLL_INTERVAL_MS; // 60초 타임아웃
 
@@ -103,7 +104,7 @@ async function waitForDirtyPageDecrease(): Promise<void> {
     if (currentDirty < DIRTY_PAGE_LIMIT) {
       const dirtyMB = Math.round(currentDirty / 1024 / 1024);
       const limitMB = Math.round(DIRTY_PAGE_LIMIT / 1024 / 1024);
-      console.log(
+      log.warn(
         `[DirtyPageThrottler] Dirty page 감소: ${dirtyMB}MB (limit: ${limitMB}MB)`,
       );
       break;
@@ -115,7 +116,7 @@ async function waitForDirtyPageDecrease(): Promise<void> {
   }
 
   if (attempts >= maxAttempts) {
-    console.warn("[DirtyPageThrottler] Dirty page throttle 타임아웃 (60초)");
+    log.warn("[DirtyPageThrottler] Dirty page throttle 타임아웃 (60초)");
   }
 }
 
@@ -125,23 +126,23 @@ async function waitForDirtyPageDecrease(): Promise<void> {
  * stream write 전에 호출하여 고속 업로드로 인한
  * dirty page 폭증을 방지
  */
-export async function throttleIfNeeded(): Promise<void> {
+export async function throttleIfNeeded(log: FastifyBaseLogger): Promise<void> {
   if (!ENABLE_THROTTLE) {
     return;
   }
 
   const currentDirty = await getDirtyPageSizeCached();
-  console.warn(`[Dirty] : 현재 Dirty ${currentDirty}`);
+  log.warn(`[Dirty] : 현재 Dirty ${currentDirty}, Limit ${DIRTY_PAGE_LIMIT}`);
 
   if (currentDirty >= DIRTY_PAGE_LIMIT) {
     const dirtyMB = Math.round(currentDirty / 1024 / 1024);
     const limitMB = Math.round(DIRTY_PAGE_LIMIT / 1024 / 1024);
 
-    console.warn(
+    log.warn(
       `[DirtyPageThrottler] dirty page 초과: ${dirtyMB}MB (limit: ${limitMB}MB), 대기 중...`,
     );
 
-    await waitForDirtyPageDecrease();
+    await waitForDirtyPageDecrease(log);
   }
 }
 

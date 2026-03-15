@@ -55,7 +55,12 @@ export async function uploadFile(
   validatePresignedUrlRequest(request.query, "PUT");
   validateReplicationBodyStream(bodyStream);
 
-  const filePath = await saveStreamToStorage(bucket, objectKey, bodyStream);
+  const filePath = await saveStreamToStorage(
+    bucket,
+    objectKey,
+    bodyStream,
+    request.log,
+  );
   const fileInfo = await collectStreamFileInfo(
     bucket,
     objectKey,

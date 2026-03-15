@@ -6,6 +6,7 @@ import {
   startReplicationWorker,
   stopReplicationWorker,
 } from "./services/replication/replicationWorker";
+import { getThrottleConfig } from "./services/storage/dirtyPageThrottler";
 
 dotenv.config();
 export interface AppOptions
@@ -33,6 +34,10 @@ const app: FastifyPluginAsync<AppOptions> = async (
 
   // replication retry worker 실행
   fastify.addHook("onReady", function (done) {
+    fastify.log.info(
+      { throttleConfig: getThrottleConfig() },
+      "Dirty page throttle config",
+    );
     startReplicationWorker(fastify.replicationQueue, fastify.log);
     done();
   });
