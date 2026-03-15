@@ -7,6 +7,7 @@ import { MultipartFile } from '@fastify/multipart'
 import crypto from 'crypto'
 import { HttpError } from '../../utils/HttpError'
 import { CONTENT_TYPE_MAP, DEFAULT_CONTENT_TYPE } from '../../constants/contentTypes'
+import { throttleIfNeeded } from './dirtyPageThrottler'
 
 /* 현재 진행 중인 DISK 쓰기 작업 수 (pipeline 단위)*/
 let _activeDiskWrites = 0
@@ -61,29 +62,6 @@ export function validateFileData(data: MultipartFile | undefined): void {
 }
 
 /**
- * 파일을 로컬 파일시스템에 저장
- */
-export async function saveFileToStorage(
-  bucket: string,
-  objectKey: string,
-  fileData: MultipartFile
-): Promise<string> {
-  const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
-  const fileDir = path.dirname(filePath)
-
-  // 디렉토리 생성 (없으면)
-  await fsPromises.mkdir(fileDir, { recursive: true })
-
-  // 파일 저장
-  const writeStream = fs.createWriteStream(filePath)
-  writeStream.once('close', () => { _activeDiskWrites-- })
-  _activeDiskWrites++
-  await pipeline(fileData.file, writeStream)
-
-  return filePath
-}
-
-/**
  * 파일 정보 수집
  */
 export async function collectFileInfo(
@@ -116,6 +94,9 @@ export async function saveStreamToStorage(
   objectKey: string,
   stream: Readable
 ): Promise<string> {
+  // Dirty page 기반 throttle 적용
+  await throttleIfNeeded()
+
   const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
   const fileDir = path.dirname(filePath)
 
