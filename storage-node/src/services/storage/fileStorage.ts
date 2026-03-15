@@ -141,9 +141,24 @@ export async function collectStreamFileInfo(
  * 파일의 SHA-256 해시를 생성하여 ETag로 사용
  */
 export async function generateETag(filePath: string): Promise<string> {
-  const fileBuffer = await fsPromises.readFile(filePath)
   const hash = crypto.createHash('sha256')
-  hash.update(fileBuffer)
+
+  await new Promise<void>((resolve, reject) => {
+    const readStream = fs.createReadStream(filePath)
+
+    readStream.on('data', (chunk) => {
+      hash.update(chunk)
+    })
+
+    readStream.on('end', () => {
+      resolve()
+    })
+
+    readStream.on('error', (error) => {
+      reject(error)
+    })
+  })
+
   return hash.digest('hex')
 }
 
