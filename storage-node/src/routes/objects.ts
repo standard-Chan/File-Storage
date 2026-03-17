@@ -4,10 +4,8 @@ import {
   createSuccessResponse,
 } from "../services/response/apiResponse";
 import { HttpError } from "../utils/HttpError";
-import {
-  downloadFile,
-  uploadFile,
-} from "../services/objects/objectService";
+import { downloadFile, uploadFile } from "../services/objects/objectService";
+import { UploadLimiter } from "../services/objects/UploadLimiter";
 
 export interface PresignedQuery {
   bucket: string;
@@ -24,13 +22,11 @@ interface ObjectParams {
 }
 
 const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  // multipart 파서가 처리하지 않는 Content-Type(raw binary 등)을 스트림으로 그대로 통과
-  fastify.addContentTypeParser(
-    "*",
-    function (_request, payload, done) {
-      done(null, payload);
-    },
-  );
+  const uploadLimiter = UploadLimiter.getInstance();
+
+  fastify.addContentTypeParser("*", function (_request, payload, done) {
+    done(null, payload);
+  });
 
   /**
    * GET /objects/:bucket/:key
@@ -78,12 +74,18 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     Params: ObjectParams;
     Querystring: PresignedQuery;
   }>("/objects/direct/:bucket/*", async function (request, reply) {
-    try {
-      const fileInfo = await uploadFile(
-        request,
-        fastify.replicationQueue,
-      );
+    const fileSize = Number(request.query.fileSize);
+    const acquired = uploadLimiter.tryAcquire(fileSize);
 
+    if (!fileSize || !acquired) {
+      request.log.warn(`[Upload Limiter] 업로드 요청이 과도하게 발생하였습니다`);
+      return reply.code(429).send({
+        message: "현재 과도한 업로드 요청으로 인해 처리할 수 없습니다",
+      });
+    }
+
+    try {
+      const fileInfo = await uploadFile(request, fastify.replicationQueue);
       return reply.code(201).send(createSuccessResponse(fileInfo));
     } catch (error) {
       if (error instanceof HttpError) {
@@ -107,6 +109,8 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           error: error instanceof Error ? error.message : "알 수 없는 오류",
         },
       );
+    } finally {
+      uploadLimiter.release(fileSize);
     }
   });
 };
