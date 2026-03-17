@@ -8,7 +8,6 @@ import { FastifyBaseLogger } from 'fastify'
 import crypto from 'crypto'
 import { HttpError } from '../../utils/HttpError'
 import { CONTENT_TYPE_MAP, DEFAULT_CONTENT_TYPE } from '../../constants/contentTypes'
-import { throttleIfNeeded } from './dirtyPageThrottler'
 
 /* 현재 진행 중인 DISK 쓰기 작업 수 (pipeline 단위)*/
 let _activeDiskWrites = 0
@@ -96,8 +95,6 @@ export async function saveStreamToStorage(
   stream: Readable,
   log: FastifyBaseLogger,
 ): Promise<string> {
-  // Dirty page 기반 throttle 적용
-  await throttleIfNeeded(log)
 
   const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
   const fileDir = path.dirname(filePath)
