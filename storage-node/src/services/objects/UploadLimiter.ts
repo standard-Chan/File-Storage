@@ -1,3 +1,4 @@
+import { FastifyRequest } from "fastify";
 import { MB } from "../../constants/sizes";
 
 interface UploadLimiterOptions {
@@ -13,7 +14,7 @@ export class UploadLimiter {
   private readonly standardMb: number;
 
   private constructor(options?: Partial<UploadLimiterOptions>) {
-    const maxUsage = options?.maxUsage ?? 100;
+    const maxUsage = options?.maxUsage ?? 50;
     const standardMb = options?.baseUnitMb ?? 5;
 
     this.maxUsage = maxUsage;
@@ -40,8 +41,9 @@ export class UploadLimiter {
     return Math.max(1, Math.min(fileSizeMb, this.standardMb));
   }
 
-  tryAcquire(fileSize: number): boolean {
+  tryAcquire(fileSize: number, request:FastifyRequest): boolean {
     const weight = this.getWeight(fileSize);
+    request.log.info(`[현재 사용량] : ${this.activeUsage}`);
 
     if (this.activeUsage + weight > this.maxUsage) {
       return false;

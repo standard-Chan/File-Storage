@@ -75,7 +75,7 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     Querystring: PresignedQuery;
   }>("/objects/direct/:bucket/*", async function (request, reply) {
     const fileSize = Number(request.query.fileSize);
-    const acquired = uploadLimiter.tryAcquire(fileSize);
+    const acquired = uploadLimiter.tryAcquire(fileSize, request);
 
     if (!fileSize || !acquired) {
       request.log.warn(`[Upload Limiter] 업로드 요청이 과도하게 발생하였습니다`);
