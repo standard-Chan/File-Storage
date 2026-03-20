@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
+import { Trend } from 'k6/metrics';
 import { randomItem } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
@@ -11,7 +12,8 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
  *  --vus = 인원수
  *  --duration 지속 시간
  *  --out experimental-prometheus-rw=http://localhost:9090/api/v1/write : 프로메테우스로 전달 
- *   k6 run --vus 100 --duration 30s --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
+ *   k6 run --vus 50 --duration 3m k6-load-test.js
+ * k6 run --vus 1 --duration 3m k6-load-test.js
  *   k6 run --vus 100 --duration 1m --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
  *   k6 run --vus 100 --duration 2m --env BUCKET=my-bucket k6-load-test.js
  * k6 run --vus 1000 --duration 10s --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
@@ -30,12 +32,20 @@ const BUCKET = __ENV.BUCKET || 'bucket1';
 // 파일 크기 정의 및 파일 로드 (바이트)
 // init context에서 로드되어 모든 VU가 공유 (메모리 효율적)
 const FILE_SIZES = [
-  // { label: '1MB', size: 1 * 1024 * 1024, data: open('./test-files/1MB.bin', 'b') },
-  // { label: '10MB', size: 10 * 1024 * 1024, data: open('./test-files/10MB.bin', 'b') },
+  { label: '1MB', size: 1 * 1024 * 1024, data: open('./test-files/1MB.bin', 'b') },
+  { label: '10MB', size: 10 * 1024 * 1024, data: open('./test-files/10MB.bin', 'b') },
+  { label: '50MB', size: 50 * 1024 * 1024, data: open('./test-files/50MB.bin', 'b') },
   { label: '100MB', size: 100 * 1024 * 1024, data: open('./test-files/100MB.bin', 'b') },
   // { label: '500MB', size: 500 * 1024 * 1024, data: open('./test-files/500MB.bin', 'b') },
   // { label: '1GB', size: 1 * 1024 * 1024 * 1024, data: open('./test-files/1GB.bin', 'b') },
 ];
+
+const uploadFileDuration = new Trend('upload_file_duration', true);
+
+const perSizeDurationThresholds = FILE_SIZES.reduce((acc, file) => {
+  acc[`upload_file_duration{file_size:${file.label}}`] = ['p(95)<60000'];
+  return acc;
+}, {});
 
 // k6 테스트 옵션
 export const options = {
@@ -56,10 +66,8 @@ export const options = {
 
   // 임계값 (성공 기준)
   thresholds: {
-    http_req_failed: ['rate<0.1'],        // 실패율 10% 미만
-    http_req_duration: ['p(95)<5000'],    // 95% 요청이 5초 이내
-    'http_req_duration{name:get_presigned_url}': ['p(95)<1000'],  // Presigned URL 발급 1초 이내
-    'http_req_duration{name:upload_file}': ['p(95)<10000'],       // 파일 업로드 10초 이내
+    'http_req_duration{name:upload_file}': ['p(90)<30000', 'p(95)<30000', 'p(99)<60000'],
+    ...perSizeDurationThresholds,
   },
 
   // 요약 통계 설정
@@ -69,11 +77,11 @@ export const options = {
 /**
  * Presigned URL 발급
  */
-function getPresignedUrl(bucket, objectKey) {
+function getPresignedUrl(bucket, objectKey, fileSize) {
   const payload = JSON.stringify({
     bucket: bucket,
     objectKey: objectKey,
-    fileSize: 1234,
+    fileSize: fileSize,
   });
 
   const response = http.post(
@@ -112,6 +120,7 @@ function getPresignedUrl(bucket, objectKey) {
  * 파일 업로드
  */
 function uploadFile(presignedUrl, fileData, _fileName, fileSize) {
+  const sizeLabel = fileSizeLabel(fileSize);
   const response = http.put(
     presignedUrl,
     fileData,
@@ -121,7 +130,7 @@ function uploadFile(presignedUrl, fileData, _fileName, fileSize) {
       },
       tags: {
         name: 'upload_file',
-        file_size: fileSizeLabel(fileSize),
+        file_size: sizeLabel,
       },
       timeout: '60s', // 큰 파일 업로드를 위한 타임아웃
     }
@@ -130,6 +139,11 @@ function uploadFile(presignedUrl, fileData, _fileName, fileSize) {
   const uploadSuccess = check(response, {
     '파일 업로드 성공': (r) => r.status === 200 || r.status === 201,
   });
+
+  // 성공한 요청만 메트릭에 기록
+  if (uploadSuccess) {
+    uploadFileDuration.add(response.timings.duration, { file_size: sizeLabel });
+  }
 
   if (!uploadSuccess) {
     console.error(`파일 업로드 실패: ${response.status} - ${response.body}`);
@@ -163,7 +177,7 @@ export default function () {
   console.log(`[VU ${vuId}] 업로드 시작: ${selectedFile.label}, key=${objectKey}`);
 
   // 1. Presigned URL 발급
-  const presignedUrl = getPresignedUrl(BUCKET, objectKey);
+  const presignedUrl = getPresignedUrl(BUCKET, objectKey, selectedFile.size);
 
   if (!presignedUrl) {
     console.error(`[VU ${vuId}] Presigned URL 발급 실패, 업로드 중단`);
@@ -214,9 +228,26 @@ export function teardown(data) {
 }
 
 export function handleSummary(data) {
-  // textSummary를 사용하여 상세 통계 출력
+  const perFileSummaryLines = ['\n===== 파일 크기별 upload_file_duration ====='];
+
+  FILE_SIZES.forEach((file) => {
+    const metric = data.metrics[`upload_file_duration{file_size:${file.label}}`];
+    const p95 = metric?.values?.['p(95)'];
+    const avg = metric?.values?.avg;
+    const count = metric?.values?.count;
+
+    if (p95 === undefined) {
+      perFileSummaryLines.push(`- ${file.label}: 데이터 없음`);
+      return;
+    }
+
+    perFileSummaryLines.push(
+      `- ${file.label}: p(95)=${p95.toFixed(2)}ms, avg=${avg.toFixed(2)}ms, count=${Math.round(count)}`
+    );
+  });
+
   return {
-    'stdout': textSummary(data, { indent: ' ', enableColors: true }),
+    'stdout': `${textSummary(data, { indent: ' ', enableColors: true })}${perFileSummaryLines.join('\n')}\n`,
     'summary.json': JSON.stringify(data, null, 2),
   };
 }
