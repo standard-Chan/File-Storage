@@ -93,7 +93,7 @@ async function isSecondaryNodeIdle(log: FastifyBaseLogger): Promise<boolean> {
 /**
  * 실패했던 데이터들을 가져와서, 재복제 요청을 보낸다
  */
-async function retryFailedReplications(
+async function tryReplications(
   replicationQueue: ReplicationQueueRepository,
   log: FastifyBaseLogger,
 ): Promise<void> {
@@ -168,7 +168,7 @@ export function startReplicationWorker(
     isWorking = true;
 
     try {
-      await retryFailedReplications(replicationQueue, log);
+      await tryReplications(replicationQueue, log);
     } catch (error) {
       log.error({ error }, "[retryWorker] poll 중 예상치 못한 오류 발생");
     } finally {
