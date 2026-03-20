@@ -14,7 +14,7 @@ export class UploadLimiter {
   private readonly standardMb: number;
 
   private constructor(options?: Partial<UploadLimiterOptions>) {
-    const maxUsage = options?.maxUsage ?? 50;
+    const maxUsage = options?.maxUsage ?? 70;
     const standardMb = options?.baseUnitMb ?? 5;
 
     this.maxUsage = maxUsage;
@@ -38,7 +38,8 @@ export class UploadLimiter {
    */
   private getWeight(fileSize: number): number {
     const fileSizeMb = Math.ceil(fileSize / MB);
-    return Math.max(1, Math.min(fileSizeMb, this.standardMb));
+    if (fileSizeMb > this.standardMb) return this.standardMb;
+    return fileSizeMb;
   }
 
   tryAcquire(fileSize: number, request:FastifyRequest): boolean {
