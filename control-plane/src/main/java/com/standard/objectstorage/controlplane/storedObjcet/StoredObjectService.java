@@ -2,7 +2,7 @@ package com.standard.objectstorage.controlplane.storedObjcet;
 
 import com.standard.objectstorage.controlplane.bucket.Bucket;
 import com.standard.objectstorage.controlplane.bucket.BucketRepository;
-import com.standard.objectstorage.controlplane.storage.dto.UploadCompleteRequest;
+import com.standard.objectstorage.controlplane.storedObjcet.dto.UploadCompleteRequest;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
