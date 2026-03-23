@@ -18,13 +18,11 @@ const diskRoute: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
         const available = stats.bavail * stats.bsize;
         const used = total - free;
 
-        const toMB = (bytes: number) => Math.floor(bytes / (1024 * 1024));
-
         const response: DiskUsageResponse = {
           nodeIp: NodeIpDetector.getCurrentNodeIp(),
-          totalSpace: toMB(total),
-          usedSpace: toMB(used),
-          availableSpace: toMB(available),
+          totalSpace: total,
+          usedSpace: used,
+          availableSpace: available,
           usagePercentage: (used / total) * 100,
           timestamp: new Date().toISOString(),
         };

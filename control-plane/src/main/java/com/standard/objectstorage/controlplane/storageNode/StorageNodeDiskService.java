@@ -38,8 +38,7 @@ public class StorageNodeDiskService {
     }
 
     /**
-     * 업로드를 위한 최적의 노드 선택 1. 모든 노드의 디스크 상태 조회 2. 파일 크기(Bytes)를 MB로 변환하여 수용 가능한 노드 필터링 3. 남은 용량이 가장 큰
-     * 노드 반환
+     * 업로드를 위한 최적의 노드 선택 1. 모든 노드의 디스크 상태 조회 2. 파일 크기(Bytes)를 수용 가능한 노드 필터링 3. 남은 용량이 가장 큰 노드 반환
      */
     public StorageNodeDiskInfo selectOptimalNodeForUpload(long fileSize) {
         List<StorageNodeDiskInfo> diskInfos = getAllStorageNodesDiskUsage();
@@ -48,13 +47,13 @@ public class StorageNodeDiskService {
             .filter(node -> node.getAvailableSpace() >= fileSize) // 용량 필터링
             .max(Comparator.comparing(StorageNodeDiskInfo::getAvailableSpace)) // 가장 여유로운 노드 선택
             .orElseThrow(() -> {
-                log.error("[Storage node] 적절한 Storage Node를 찾을 수 없습니다. (요청 크기: {} MB)", fileSize);
+                log.error("[Storage node] 적절한 Storage Node를 찾을 수 없습니다. (요청 크기: {} Byte)", fileSize);
                 return new RuntimeException("가용한 저장 공간이 부족하거나 활성화된 노드가 없습니다.");
             });
     }
 
     /**
-     * 모든 Storage Node의 디스크 사용량 조회
+     * 등록된 모든 Storage Node의 디스크 용량 조회
      *
      * @return Storage Node 디스크 정보 리스트
      */
