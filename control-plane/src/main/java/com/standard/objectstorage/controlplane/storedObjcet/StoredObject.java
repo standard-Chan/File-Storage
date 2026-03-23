@@ -19,10 +19,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "TB_OBJECTS")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -47,9 +49,20 @@ public class StoredObject {
     @Column(length = 255)
     private String etag;
 
+    @Column(length = 255, nullable = false)
+    private String primaryNodeIp;
+
+    @Column(length = 255)
+    private String secondaryNodeIp;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ObjectStatus status;
+
+    @Column(columnDefinition = "BIGINT DEFAULT 0")
+    private Long numberOfDownloads;
+
+    // TODO: Secondary replication 완료 여부 필드 필요. 혹은 ObjectStatus로 상태 표시 (로드밸런싱용)
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
