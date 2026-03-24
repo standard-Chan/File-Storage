@@ -6,6 +6,7 @@ import {
   startReplicationWorker,
   stopReplicationWorker,
 } from "./services/replication/replicationWorker";
+import { NodeIpDetector } from "./utils/NodeIpDetector";
 
 dotenv.config();
 export interface AppOptions
@@ -41,6 +42,9 @@ const app: FastifyPluginAsync<AppOptions> = async (
     stopReplicationWorker(fastify.log);
     done();
   });
+
+  // log
+  fastify.log.info(`서버 IP : ${NodeIpDetector.getCurrentNodeIp()}`);
 };
 
 export default app;
