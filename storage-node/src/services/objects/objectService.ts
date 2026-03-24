@@ -107,7 +107,7 @@ async function notifyUploadComplete(
   try {
     const controlPlaneUrl = process.env.CONTROL_PLANE_URL;
     if (!controlPlaneUrl) {
-      log.warn("CONTROL_PLANE_URL environment variable is not set");
+      log.warn("[upload complete] 환경변수 control plane URL이 존재하지 않습니다.");
       return;
     }
 
@@ -116,7 +116,7 @@ async function notifyUploadComplete(
       "Sending upload complete notification to control plane"
     );
 
-    const response = await fetch(`${controlPlaneUrl}/api/storage/upload-complete`, {
+    const response = await fetch(`${controlPlaneUrl}/api/stored-objects/upload-complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(uploadInfo),
@@ -125,7 +125,7 @@ async function notifyUploadComplete(
     if (!response.ok) {
       log.error(
         { status: response.status, statusText: response.statusText },
-        "Upload complete notification failed"
+        "[upload complete] 업로드 성공 요청 전송에 실패하였스브니다."
       );
       return;
     }
