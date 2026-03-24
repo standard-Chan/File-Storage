@@ -75,20 +75,14 @@ public class PresignedUrlService {
         long fileSize, String method, String nodeIp) {
 
         try {
-            if ((SECRET_KEY == null || SECRET_KEY.isBlank()) || (NODE_ENDPOINT == null
-                || NODE_ENDPOINT.isBlank())) {
-                log.error("환경 변수 누락 - SECRET_KEY 또는 NODE_ENDPOINT가 비어있습니다.");
-                throw new IllegalStateException("환경 변수 SECRET_KEY 또는 NODE_ENDPOINT가 설정되지 않았습니다.");
-            }
-
             long expiresAt = Instant.now().plusSeconds(60 * 15).getEpochSecond();
             String signature = generateSignature(bucket, objectKey, method, expiresAt, fileSize);
             String encodedBucket = UriUtils.encodePathSegment(bucket, StandardCharsets.UTF_8);
             String encodedObjectKey = UriUtils.encodePath(objectKey, StandardCharsets.UTF_8);
 
             return String.format(
-                "%s/%s/%s/%s?bucket=%s&objectKey=%s&method=%s&exp=%d&fileSize=%d&signature=%s",
-                NODE_ENDPOINT, basePath, encodedBucket, encodedObjectKey, bucket, objectKey, method,
+                "http://%s/%s/%s/%s?bucket=%s&objectKey=%s&method=%s&exp=%d&fileSize=%d&signature=%s",
+                nodeIp, basePath, encodedBucket, encodedObjectKey, bucket, objectKey, method,
                 expiresAt, fileSize, signature);
 
         } catch (Exception e) {
