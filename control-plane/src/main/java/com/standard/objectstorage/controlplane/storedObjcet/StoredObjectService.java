@@ -26,7 +26,8 @@ public class StoredObjectService {
      * 업로드 완료된 Object 정보를 저장
      */
     public void saveUploadedObject(UploadCompleteRequest request) {
-        log.info("Saving uploaded object - bucket: {}, objectKey: {}, primaryNodeIp: {}",
+        log.info(
+            "[save uploaded] 시도 : 업로드 성공 객체 정보 저장 - bucket: {}, objectKey: {}, primaryNodeIp: {}",
             request.getBucket(), request.getObjectKey(), request.getPrimaryNodeIp());
 
         Bucket bucket = bucketRepository.findByName(request.getBucket())
@@ -45,7 +46,7 @@ public class StoredObjectService {
             .build();
 
         storedObjectRepository.save(storedObject);
-        log.info("Successfully saved object - id: {}", storedObject.getId());
+        log.info("[save uploaded] 성공 : 업로드 성공 객체 정보 저장  - id: {}", storedObject.getId());
     }
 
     /**

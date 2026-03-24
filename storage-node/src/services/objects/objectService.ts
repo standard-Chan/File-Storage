@@ -24,7 +24,7 @@ export interface DownloadResult {
  * - 파일 스트림 및 Content-Type 반환
  */
 export async function downloadFile(
-  request: FastifyRequest<{ Querystring: PresignedQuery }>
+  request: FastifyRequest<{ Querystring: PresignedQuery }>,
 ): Promise<DownloadResult> {
   const { bucket, objectKey } = request.query;
   request.log.info({ objectKey }, "GET request received");
@@ -73,14 +73,17 @@ export async function uploadFile(
   replicationQueue.registerReplicationTask(bucket, objectKey);
   request.log.info({ bucket, objectKey }, "replication_queue에 복제 등록 완료");
 
-  notifyUploadComplete({
-    bucket,
-    objectKey,
-    fileSize: fileInfo.size,
-    etag: fileInfo.etag ?? "",
-    storagePath: fileInfo.storagePath,
-    primaryNodeIp: NodeIpDetector.getCurrentNodeIp(),
-  }, request.log);
+  notifyUploadComplete(
+    {
+      bucket,
+      objectKey,
+      fileSize: fileInfo.size,
+      etag: fileInfo.etag ?? "",
+      storagePath: fileInfo.storagePath,
+      primaryNodeIp: NodeIpDetector.getCurrentNodeIp(),
+    },
+    request.log,
+  );
 
   return fileInfo;
 }
@@ -102,43 +105,70 @@ async function notifyUploadComplete(
     storagePath: string;
     primaryNodeIp: string;
   },
-  log: any
+  log: any,
 ) {
   try {
     const controlPlaneUrl = process.env.CONTROL_PLANE_URL;
     if (!controlPlaneUrl) {
-      log.warn("[upload complete] 환경변수 control plane URL이 존재하지 않습니다.");
+      log.warn(
+        "[upload complete] 환경변수 control plane URL이 존재하지 않습니다.",
+      );
       return;
     }
 
     log.info(
-      { bucket: uploadInfo.bucket, objectKey: uploadInfo.objectKey, primaryNodeIp: uploadInfo.primaryNodeIp },
-      "Sending upload complete notification to control plane"
+      {
+        bucket: uploadInfo.bucket,
+        objectKey: uploadInfo.objectKey,
+        primaryNodeIp: uploadInfo.primaryNodeIp,
+        controlPlaneUrl,
+      },
+      "[upload complete] control plane로 업로드 요청 시도",
     );
 
-    const response = await fetch(`${controlPlaneUrl}/api/stored-objects/upload-complete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(uploadInfo),
-    });
+    const response = await fetch(
+      `${controlPlaneUrl}/api/stored-objects/upload-complete`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uploadInfo),
+      },
+    );
 
     if (!response.ok) {
       log.error(
         { status: response.status, statusText: response.statusText },
-        "[upload complete] 업로드 성공 요청 전송에 실패하였스브니다."
+        "[upload complete] control plane으로 업로드 성공 요청 전송 실패",
       );
       return;
     }
 
     log.info(
       { bucket: uploadInfo.bucket, objectKey: uploadInfo.objectKey },
-      "Upload complete notification sent successfully"
+      "[upload complete] control plane으로 업로드 정보 전송 완료",
     );
-  } catch (error) {
-    log.error(
-      { error, bucket: uploadInfo.bucket, objectKey: uploadInfo.objectKey },
-      "Error sending upload complete notification"
-    );
-    // TODO: Retry 로직 필요
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      log.error(
+        {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          bucket: uploadInfo.bucket,
+          objectKey: uploadInfo.objectKey,
+        },
+        "[upload complete] 실패 : control plane으로 업로드 실패",
+      );
+    } else {
+      log.error(
+        {
+          error,
+          bucket: uploadInfo.bucket,
+          objectKey: uploadInfo.objectKey,
+        },
+        "[upload complete] 알수없는 에러 ",
+      );
+    }
+    // TODO: Retry 로 실패 문제 해결하기
   }
 }
