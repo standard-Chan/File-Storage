@@ -14,8 +14,8 @@ export class UploadLimiter {
   private readonly standardMb: number;
 
   private constructor(options?: Partial<UploadLimiterOptions>) {
-    const maxUsage = options?.maxUsage ?? 70;
-    const standardMb = options?.baseUnitMb ?? 5;
+    const maxUsage = options?.maxUsage ?? parseInt(process.env.MAX_USAGE ?? "70", 10);
+    const standardMb = options?.baseUnitMb ?? parseInt(process.env.BASE_UNIT_MB ?? "2", 10);
 
     this.maxUsage = maxUsage;
     this.standardMb = standardMb;
