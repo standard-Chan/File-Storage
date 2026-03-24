@@ -22,6 +22,9 @@ public class PresignedUrlService {
     @Value("${SECRET_KEY}")
     private String SECRET_KEY;
 
+    @Value("${PORT_NUMBER:3000}")
+    private String STORAGE_NODE_PORT;
+
     private final StorageNodeDiskService storageNodeDiskService;
     private final StoredObjectService storedObjectService;
 
@@ -46,7 +49,7 @@ public class PresignedUrlService {
             selectedNode.getNodeIp(), selectedNode.getAvailableSpace());
 
         return generatePresignedUrl(DIRECT_PATH, bucket, objectKey, fileSize, "PUT",
-            selectedNode.getNodeIp());
+            selectedNode.getNodeIp(), STORAGE_NODE_PORT);
     }
 
     /**
@@ -62,7 +65,7 @@ public class PresignedUrlService {
         storedObjectService.incrementDownloadCount(storedObject.getId());
 
         String presignedUrl = generatePresignedUrl(DIRECT_PATH, bucket, objectKey, fileSize, "GET",
-            storedObject.getPrimaryNodeIp());
+            storedObject.getPrimaryNodeIp(), STORAGE_NODE_PORT);
 
         log.info("업로드 Presigned URL 생성 - url: {}", presignedUrl);
 
@@ -73,7 +76,7 @@ public class PresignedUrlService {
      * Presigned URL 생성
      */
     private String generatePresignedUrl(String basePath, String bucket, String objectKey,
-        long fileSize, String method, String nodeIp) {
+        long fileSize, String method, String nodeIp, String portNumber) {
 
         try {
             long expiresAt = Instant.now().plusSeconds(60 * 15).getEpochSecond();
@@ -82,8 +85,9 @@ public class PresignedUrlService {
             String encodedObjectKey = UriUtils.encodePath(objectKey, StandardCharsets.UTF_8);
 
             return String.format(
-                "http://%s/%s/%s/%s?bucket=%s&objectKey=%s&method=%s&exp=%d&fileSize=%d&signature=%s",
-                nodeIp, basePath, encodedBucket, encodedObjectKey, bucket, objectKey, method,
+                "http://%s:%s/%s/%s/%s?bucket=%s&objectKey=%s&method=%s&exp=%d&fileSize=%d&signature=%s",
+                nodeIp, portNumber, basePath, encodedBucket, encodedObjectKey, bucket, objectKey,
+                method,
                 expiresAt, fileSize, signature);
 
         } catch (Exception e) {
