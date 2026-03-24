@@ -53,7 +53,7 @@ public class PresignedUrlService {
      * Download Presigned URL 생성
      */
     public String generateGetPresignedUrl(String bucket, String objectKey, long fileSize) {
-        log.info("GET Presigned URL 생성 요청 - bucket: {}, objectKey: {}", bucket, objectKey);
+        log.info("업로드 Presigned URL 생성 요청 - bucket: {}, objectKey: {}", bucket, objectKey);
 
         StoredObject storedObject = storedObjectService.getObject(bucket, objectKey);
 
@@ -61,8 +61,12 @@ public class PresignedUrlService {
         // TODO: 동시성 처리 필요
         storedObjectService.incrementDownloadCount(storedObject.getId());
 
-        return generatePresignedUrl(DIRECT_PATH, bucket, objectKey, fileSize, "GET",
+        String presignedUrl = generatePresignedUrl(DIRECT_PATH, bucket, objectKey, fileSize, "GET",
             storedObject.getPrimaryNodeIp());
+
+        log.info("업로드 Presigned URL 생성 - url: {}", presignedUrl);
+
+        return presignedUrl;
     }
 
     /**
