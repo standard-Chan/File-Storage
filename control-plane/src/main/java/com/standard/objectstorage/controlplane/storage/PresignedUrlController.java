@@ -2,7 +2,6 @@ package com.standard.objectstorage.controlplane.storage;
 
 import com.standard.objectstorage.controlplane.storage.dto.PresignedUrlRequest;
 import com.standard.objectstorage.controlplane.storage.dto.PresignedUrlResponse;
-import com.standard.objectstorage.controlplane.storedObjcet.StoredObjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PresignedUrlController {
 
     private final PresignedUrlService presignedUrlService;
-    private final StoredObjectService storedObjectService;
 
     @PostMapping("/presigned-url")
     public PresignedUrlResponse createPutPresignedUrl(

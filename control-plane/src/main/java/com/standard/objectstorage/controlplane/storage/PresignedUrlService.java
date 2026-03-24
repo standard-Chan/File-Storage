@@ -22,9 +22,6 @@ public class PresignedUrlService {
     @Value("${SECRET_KEY}")
     private String SECRET_KEY;
 
-    @Value("${NODE_ENDPOINT}")
-    private String NODE_ENDPOINT;
-
     private final StorageNodeDiskService storageNodeDiskService;
     private final StoredObjectService storedObjectService;
 
