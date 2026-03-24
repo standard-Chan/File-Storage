@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.standard.objectstorage'
-version = '1.1.2-SNAPSHOT'
+version = '1.2.2-SNAPSHOT'
 description = 'control-plane'
 
 java {
