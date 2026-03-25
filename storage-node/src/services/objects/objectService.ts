@@ -1,4 +1,4 @@
-import { FastifyRequest } from "fastify";
+import { FastifyBaseLogger, FastifyRequest } from "fastify";
 import { validatePresignedUrlRequest } from "../validation/presignedUrl";
 import {
   saveStreamToStorage,
@@ -105,15 +105,12 @@ async function notifyUploadComplete(
     storagePath: string;
     primaryNodeIp: string;
   },
-  log: any,
+  log: FastifyBaseLogger,
 ) {
   try {
     const controlPlaneUrl = process.env.CONTROL_PLANE_URL;
     if (!controlPlaneUrl) {
-      log.warn(
-        "[upload complete] 환경변수 control plane URL이 존재하지 않습니다.",
-      );
-      return;
+      throw new Error("CONTROL_PLANE_URL 값이 설정되지 않았습니다.");
     }
 
     log.info(
@@ -140,7 +137,9 @@ async function notifyUploadComplete(
         { status: response.status, statusText: response.statusText },
         "[upload complete] control plane으로 업로드 성공 요청 전송 실패",
       );
-      return;
+      throw new Error(
+        `Upload complete failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     log.info(
@@ -148,6 +147,7 @@ async function notifyUploadComplete(
       "[upload complete] control plane으로 업로드 정보 전송 완료",
     );
   } catch (error: unknown) {
+  // TODO: Retry 로 실패 문제 해결하기
     if (error instanceof Error) {
       log.error(
         {
@@ -169,6 +169,5 @@ async function notifyUploadComplete(
         "[upload complete] 알수없는 에러 ",
       );
     }
-    // TODO: Retry 로 실패 문제 해결하기
   }
 }
