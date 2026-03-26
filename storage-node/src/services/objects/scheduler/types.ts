@@ -33,3 +33,24 @@ export interface PriorityScore {
   sizePriority: number;
   waitBonus: number;
 }
+
+export interface EnqueueInput {
+  jobId: string;
+  bucket: string;
+  objectKey: string;
+  fileSize: number;
+  clientId: string;
+}
+
+export interface AdmissionGrant {
+  jobId: string;
+}
+
+export type AdmissionState = "waiting" | "granted" | "timed_out" | "cancelled";
+
+export interface AdmissionTicket {
+  jobId: string;
+  state: AdmissionState;
+  resolve: (grant: AdmissionGrant) => void;
+  reject: (error: Error) => void;
+}
