@@ -1,4 +1,5 @@
 import { SchedulerConfig } from "./types";
+import { parsePositiveInt, parseNonNegativeInt } from "../../../utils/envParser";
 
 const DEFAULTS: SchedulerConfig = {
   maxQueuedJobs: 500,
@@ -15,32 +16,9 @@ const DEFAULTS: SchedulerConfig = {
   maxSizePriority: 100,
 };
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`유효하지 않은 양의 정수 환경변수 값: ${value}`);
-  }
-
-  return parsed;
-}
-
-function parseNonNegativeInt(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error(`유효하지 않은 0 이상 정수 환경변수 값: ${value}`);
-  }
-
-  return parsed;
-}
-
+/**
+ * 스케줄러 설정 값의 유효성 검증
+ */
 function validateSchedulerConfig(config: SchedulerConfig): SchedulerConfig {
   if (config.globalIngressLimitBps < config.minRatePerJobBps) {
     throw new Error(

@@ -28,7 +28,7 @@ export interface SchedulerConfig {
   maxSizePriority: number;
 }
 
-export interface PriorityScoreInQueue {
+export interface PriorityScore {
   score: number;
   sizePriority: number;
   waitBonus: number;
