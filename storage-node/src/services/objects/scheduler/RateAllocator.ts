@@ -12,10 +12,6 @@ export interface RateAllocatorConfig {
   rateStepDownBps: number;
 }
 
-export interface RateAllocationInput {
-  runningJobs: RateAllocationJob[];
-}
-
 export interface RateAllocationResult {
   byJobId: Map<string, number>;
   totalAllocatedBps: number;
@@ -53,8 +49,7 @@ export class RateAllocator {
    * 2. step limit 적용 (급격한 변화 제한)
    * 3. global limit 초과 시 재조정
    */
-  allocate(input: RateAllocationInput): RateAllocationResult {
-    const { runningJobs } = input;
+  allocate(runningJobs: RateAllocationJob[]): RateAllocationResult {
     if (runningJobs.length === 0) {
       return { byJobId: new Map<string, number>(), totalAllocatedBps: 0 };
     }
@@ -64,20 +59,28 @@ export class RateAllocator {
       throw new Error("minRate 합이 global 상한을 초과합니다.");
     }
 
-    const targetByJobId = this.allocateRate(runningJobs);
-    const limitedByJobId = this.applyRateStepLimit(runningJobs, targetByJobId);
-    const boundedByJobId = this.enforceGlobalLimitWithMinRate(
+    // 1. score 기반 목표 rate 계산
+    const targetRateMap = this.allocateRate(runningJobs);
+
+    // 2. step 제한 적용 (급격한 변화 제한)
+    const stepLimitedRateMap = this.applyRateStepLimit(
       runningJobs,
-      limitedByJobId,
+      targetRateMap,
+    );
+
+    // 3. global limit 초과 시 조정 (최종 결과)
+    const finalRateMap = this.enforceGlobalLimitWithMinRate(
+      runningJobs,
+      stepLimitedRateMap,
     );
 
     let total = 0;
-    for (const rate of boundedByJobId.values()) {
+    for (const rate of finalRateMap.values()) {
       total += rate;
     }
 
     return {
-      byJobId: boundedByJobId,
+      byJobId: finalRateMap,
       totalAllocatedBps: total,
     };
   }
