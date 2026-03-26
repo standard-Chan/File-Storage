@@ -1,4 +1,5 @@
 import { PriorityQueue } from "./PriorityQueue";
+import { RateAllocator } from "./RateAllocator";
 import { ScorePolicy } from "./ScorePolicy";
 import {
   AdmissionGrant,
@@ -16,15 +17,25 @@ export class UploadScheduler {
   private readonly runningJobs = new Map<string, UploadJob>();
   private readonly config: SchedulerConfig;
   private readonly scorePolicy: ScorePolicy;
+  private readonly rateAllocator: RateAllocator;
 
   private isDispatching = false;
   private dispatchQueued = false;
   private started = false;
+  private reallocationTimer: NodeJS.Timeout | null = null;
+  private consecutiveReallocationErrors = 0;
 
   private constructor(config: SchedulerConfig, scorePolicy: ScorePolicy) {
     this.config = config;
     this.scorePolicy = scorePolicy;
     this.queue = new PriorityQueue(config.maxQueuedJobs);
+    this.rateAllocator = new RateAllocator({
+      globalIngressLimitBps: config.globalIngressLimitBps,
+      minRatePerJobBps: config.minRatePerJobBps,
+      enableResidueRebalance: config.enableResidueRebalance,
+      rateStepUpBps: config.rateStepUpBps,
+      rateStepDownBps: config.rateStepDownBps,
+    });
   }
 
   static initialize(config: SchedulerConfig, scorePolicy: ScorePolicy): void {
@@ -46,10 +57,37 @@ export class UploadScheduler {
   start(): void {
     this.started = true;
     this.scheduleDispatch();
+    this.startReallocationLoop();
   }
 
   stop(): void {
     this.started = false;
+    this.stopReallocationLoop();
+  }
+
+  startReallocationLoop(): void {
+    if (this.reallocationTimer !== null) {
+      return;
+    }
+
+    this.reallocationTimer = setInterval(() => {
+      this.runReallocationTick();
+    }, this.config.reallocationIntervalMs);
+  }
+
+  stopReallocationLoop(): void {
+    if (this.reallocationTimer !== null) {
+      clearInterval(this.reallocationTimer);
+      this.reallocationTimer = null;
+    }
+  }
+
+  getCurrentAllocatedRateBps(jobId: string): number {
+    const job = this.runningJobs.get(jobId);
+    if (!job) {
+      return this.config.minRatePerJobBps;
+    }
+    return Math.max(this.config.minRatePerJobBps, job.allocatedRateBps);
   }
 
    /**
@@ -249,6 +287,67 @@ export class UploadScheduler {
     }
 
     this.queue.reheapify();
+  }
+
+  /**
+   * 주기적으로 실행되는 파일 업로드 속도 rate 재할당 tick
+   * - 1. 모든 running jobs 정보 획득
+   * - 2. 각 running job의 할당할 대역폭을 계산
+   * - 3. running job에게 할당한다.
+   * - 결과 반영 (fail-open 정책)
+   */
+  private runReallocationTick(): void {
+    if (!this.started) {
+      return;
+    }
+
+    // 실행 중인 job  snapshot 획득
+    const running = [...this.runningJobs.values()].map((job) => ({
+      jobId: job.jobId,
+      score: Math.max(1, job.score),
+      previousAllocatedRateBps: Math.max(this.config.minRatePerJobBps, job.allocatedRateBps),
+    }));
+    if (running.length === 0) {
+      this.consecutiveReallocationErrors = 0;
+      return;
+    }
+
+    try {
+      // 대역폭 계산
+      const allocationResult = this.rateAllocator.allocate(running);
+      // running 작업에 대역폭 할당
+      this.applyAllocationResult(allocationResult.allocatedRateByJobIdMap);
+      this.consecutiveReallocationErrors = 0;
+    } catch (error) {
+      this.consecutiveReallocationErrors += 1;
+
+      if (this.consecutiveReallocationErrors >= this.config.reallocationErrorThreshold) {
+        console.error("[UploadScheduler] reallocation 연속 실패", {
+          consecutiveFailures: this.consecutiveReallocationErrors,
+          error,
+        });
+        return;
+      }
+
+      console.warn("[UploadScheduler] reallocation 실패. 이전 rate를 유지합니다.", {
+        consecutiveFailures: this.consecutiveReallocationErrors,
+        error,
+      });
+    }
+  }
+
+  // running 중인 job들의 속도를 할당
+  private applyAllocationResult(byJobId: Map<string, number>): void {
+    for (const [jobId, rate] of byJobId) {
+      this.updateRunningJobAllocatedRate(jobId, rate);
+    }
+  }
+
+  private updateRunningJobAllocatedRate(jobId: string, rate: number): void {
+    const runningJob = this.runningJobs.get(jobId);
+    if (!runningJob) return;
+
+    runningJob.allocatedRateBps = Math.max(this.config.minRatePerJobBps, rate);
   }
 
   private getQueuedBytes(): number {

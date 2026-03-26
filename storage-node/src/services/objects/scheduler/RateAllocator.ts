@@ -13,7 +13,7 @@ export interface RateAllocatorConfig {
 }
 
 export interface RateAllocationResult {
-  byJobId: Map<string, number>;
+  allocatedRateByJobIdMap: Map<string, number>;
   totalAllocatedBps: number;
 }
 
@@ -51,7 +51,7 @@ export class RateAllocator {
    */
   allocate(runningJobs: RateAllocationJob[]): RateAllocationResult {
     if (runningJobs.length === 0) {
-      return { byJobId: new Map<string, number>(), totalAllocatedBps: 0 };
+      return { allocatedRateByJobIdMap: new Map<string, number>(), totalAllocatedBps: 0 };
     }
 
     const minTotalBps = runningJobs.length * this.config.minRatePerJobBps;
@@ -80,7 +80,7 @@ export class RateAllocator {
     }
 
     return {
-      byJobId: finalRateMap,
+      allocatedRateByJobIdMap: finalRateMap,
       totalAllocatedBps: total,
     };
   }
