@@ -1,5 +1,5 @@
 import { SchedulerConfig } from "./types";
-import { parsePositiveInt, parseNonNegativeInt } from "../../../utils/envParser";
+import { parseBoolean, parsePositiveInt, parseNonNegativeInt } from "../../../utils/envParser";
 
 const DEFAULTS: SchedulerConfig = {
   maxQueuedJobs: 500,
@@ -8,7 +8,11 @@ const DEFAULTS: SchedulerConfig = {
   queueTimeoutMs: 30_000,
   globalIngressLimitBps: 20 * 1024 * 1024,
   minRatePerJobBps: 256 * 1024,
-  reallocationIntervalMs: 200,
+  reallocationIntervalMs: 250,
+  enableResidueRebalance: true,
+  rateStepUpBps: 256 * 1024,
+  rateStepDownBps: 512 * 1024,
+  reallocationErrorThreshold: 10,
   tokenBucketCapacityBytes: 512 * 1024,
   transformBufferLimitBytes: 1024 * 1024,
   waitBonusWindowMs: 5_000,
@@ -30,6 +34,10 @@ function validateSchedulerConfig(config: SchedulerConfig): SchedulerConfig {
     throw new Error(
       "maxRunningJobs * minRatePerJobBps 가 globalIngressLimitBps 를 초과합니다. maxRunningJobs 또는 minRatePerJobBps 를 낮추거나 globalIngressLimitBps 를 높이세요.",
     );
+  }
+
+  if (config.rateStepUpBps <= 0 || config.rateStepDownBps <= 0) {
+    throw new Error("rateStepUpBps, rateStepDownBps 는 1 이상이어야 합니다.");
   }
 
   return config;
@@ -66,6 +74,22 @@ export function loadSchedulerConfig(
     reallocationIntervalMs: parsePositiveInt(
       env.UPLOAD_SCHEDULER_REALLOCATION_INTERVAL_MS,
       DEFAULTS.reallocationIntervalMs,
+    ),
+    enableResidueRebalance: parseBoolean(
+      env.UPLOAD_SCHEDULER_ENABLE_RESIDUE_REBALANCE,
+      DEFAULTS.enableResidueRebalance,
+    ),
+    rateStepUpBps: parsePositiveInt(
+      env.UPLOAD_SCHEDULER_RATE_STEP_UP_BPS,
+      DEFAULTS.rateStepUpBps,
+    ),
+    rateStepDownBps: parsePositiveInt(
+      env.UPLOAD_SCHEDULER_RATE_STEP_DOWN_BPS,
+      DEFAULTS.rateStepDownBps,
+    ),
+    reallocationErrorThreshold: parsePositiveInt(
+      env.UPLOAD_SCHEDULER_REALLOCATION_ERROR_THRESHOLD,
+      DEFAULTS.reallocationErrorThreshold,
     ),
     tokenBucketCapacityBytes: parsePositiveInt(
       env.UPLOAD_SCHEDULER_TOKEN_BUCKET_CAPACITY_BYTES,

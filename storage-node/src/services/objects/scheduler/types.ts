@@ -21,6 +21,10 @@ export interface SchedulerConfig {
   globalIngressLimitBps: number;
   minRatePerJobBps: number;
   reallocationIntervalMs: number;
+  enableResidueRebalance: boolean; //  잔여 속도 분배 여부 (True 시 = 대역폭을 모두 사용 가능 & CPU 사용량 up)
+  rateStepUpBps: number;  // 최소 업로드 속도 증가량
+  rateStepDownBps: number;
+  reallocationErrorThreshold: number;
   tokenBucketCapacityBytes: number;
   transformBufferLimitBytes: number;
   waitBonusWindowMs: number;

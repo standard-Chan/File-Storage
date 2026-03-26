@@ -38,3 +38,22 @@ export function parseNonNegativeInt(value: string | undefined, fallback: number)
 
   return parsed;
 }
+
+/**
+ * boolean 환경변수 파서
+ */
+export function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") {
+    return false;
+  }
+
+  throw new Error(`유효하지 않은 boolean 환경변수 값: ${value}`);
+}
