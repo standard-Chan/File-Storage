@@ -212,14 +212,14 @@ export class RateAllocator {
         continue;
       }
 
-      const minByStep = Math.max(0, previous - this.config.rateStepDownBps);
-      const maxByStep = previous + this.config.rateStepUpBps;
+      // 최대 폭 제한
+      const minByStep = Math.max(0, previous - this.config.rateStepDownBps); // 최대 감소량
+      const maxByStep = previous + this.config.rateStepUpBps;  // 최대 증가량
       const clampedByStep = Math.max(
         minByStep,
         Math.min(targetRate, maxByStep),
       );
 
-      // minRate 우선순위가 step limit보다 높다.
       limited.set(
         job.jobId,
         Math.max(this.config.minRatePerJobBps, clampedByStep),

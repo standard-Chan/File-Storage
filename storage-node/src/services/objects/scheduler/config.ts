@@ -1,22 +1,23 @@
 import { SchedulerConfig } from "./types";
 import { parseBoolean, parsePositiveInt, parseNonNegativeInt } from "../../../utils/envParser";
+import { GB, KB, MB } from "../../../constants/sizes";
 
 const DEFAULTS: SchedulerConfig = {
   maxQueuedJobs: 500,
-  maxQueuedBytes: 10 * 1024 * 1024 * 1024,
+  maxQueuedBytes: 10 * GB,
   maxRunningJobs: 100,
   queueTimeoutMs: 30_000,
-  globalIngressLimitBps: 70 * 1024 * 1024,
-  minRatePerJobBps: 256 * 1024,
+  globalIngressLimitBps: 70 * MB,
+  minRatePerJobBps: 256 * KB,
   reallocationIntervalMs: 250,
   enableResidueRebalance: true,
-  rateStepUpBps: 256 * 1024,
-  rateStepDownBps: 512 * 1024,
+  rateStepUpBps: 256 * KB,
+  rateStepDownBps: 512 * KB,
   reallocationErrorThreshold: 10,
-  tokenBucketCapacityBytes: 512 * 1024,
+  tokenBucketCapacityBytes: 512 * KB,
   rateLookupIntervalMs: 250,
   refillPumpIntervalMs: 25,
-  transformBufferLimitBytes: 1024 * 1024,
+  transformBufferLimitBytes: 1 * MB,
   waitBonusWindowMs: 5_000,
   maxWaitBonus: 20,
   maxSizePriority: 100,

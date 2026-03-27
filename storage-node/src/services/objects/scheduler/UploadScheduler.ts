@@ -225,8 +225,8 @@ export class UploadScheduler {
     this.sweepTimeout(now);
     this.refreshQueuedScores(now);
 
-    let available = this.config.maxRunningJobs - this.runningJobs.size;
-    while (available > 0 && !this.queue.isEmpty()) {
+    let availableJobs = this.config.maxRunningJobs - this.runningJobs.size;
+    while (availableJobs > 0 && !this.queue.isEmpty()) {
       const next = this.queue.dequeue();
       if (!next) {
         break;
@@ -243,7 +243,7 @@ export class UploadScheduler {
         this.waitingTickets.delete(next.jobId);
       }
 
-      available -= 1;
+      availableJobs -= 1;
     }
   }
 
