@@ -12,6 +12,9 @@ import { validateReplicationBodyStream } from "../validation/replication";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
 import { PresignedQuery } from "../../routes/objects";
 import { NodeIpDetector } from "../../utils/NodeIpDetector";
+import { getOrCreateUploadScheduler } from "./scheduler/runtime";
+import { loadSchedulerConfig } from "./scheduler/config";
+import { RateControlledTransform } from "./scheduler/RateControlledTransform";
 
 export interface DownloadResult {
   fileStream: ReturnType<typeof getFileStream>;
@@ -56,12 +59,46 @@ export async function uploadFile(
   validatePresignedUrlRequest(request.query, "PUT");
   validateReplicationBodyStream(bodyStream);
 
-  const filePath = await saveStreamToStorage(
+  const scheduler = getOrCreateUploadScheduler();
+  const schedulerConfig = loadSchedulerConfig();
+  const jobId = `${bucket}/${objectKey}/${Date.now()}-${request.id}`;
+
+  await scheduler.enqueue({
+    jobId,
     bucket,
     objectKey,
-    bodyStream,
-    request.log,
-  );
+    fileSize: Number(request.query.fileSize),
+    clientId: request.id,
+  });
+
+  const transform = new RateControlledTransform({
+    jobId,
+    scheduler,
+    capacityBytes: schedulerConfig.tokenBucketCapacityBytes,
+    highWaterMarkBytes: schedulerConfig.transformBufferLimitBytes,
+    rateLookupIntervalMs: schedulerConfig.rateLookupIntervalMs,
+    refillPumpIntervalMs: schedulerConfig.refillPumpIntervalMs,
+  });
+
+  const throttledStream = bodyStream.pipe(transform);
+
+  let filePath = "";
+  try {
+    filePath = await saveStreamToStorage(
+      bucket,
+      objectKey,
+      throttledStream,
+      request.log,
+    );
+    scheduler.jobCompleted(jobId);
+  } catch (error) {
+    scheduler.jobFailed(
+      jobId,
+      error instanceof Error ? error.message : "upload pipeline failed",
+    );
+    throw error;
+  }
+
   const fileInfo = await collectStreamFileInfo(
     bucket,
     objectKey,
@@ -73,17 +110,19 @@ export async function uploadFile(
   replicationQueue.registerReplicationTask(bucket, objectKey);
   request.log.info({ bucket, objectKey }, "replication_queue에 복제 등록 완료");
 
-  notifyUploadComplete(
-    {
-      bucket,
-      objectKey,
-      fileSize: fileInfo.size,
-      etag: fileInfo.etag ?? "",
-      storagePath: fileInfo.storagePath,
-      primaryNodeIp: NodeIpDetector.getCurrentNodeIp(),
-    },
-    request.log,
-  );
+  if (bucket == "TRUE") {
+    notifyUploadComplete(
+      {
+        bucket,
+        objectKey,
+        fileSize: fileInfo.size,
+        etag: fileInfo.etag ?? "",
+        storagePath: fileInfo.storagePath,
+        primaryNodeIp: NodeIpDetector.getCurrentNodeIp(),
+      },
+      request.log,
+    );
+  }
 
   return fileInfo;
 }
@@ -120,7 +159,7 @@ async function notifyUploadComplete(
         primaryNodeIp: uploadInfo.primaryNodeIp,
         controlPlaneUrl,
       },
-      "[upload complete] control plane로 업로드 요청 시도",
+      "[UPLOAD COMPLETE] control plane로 업로드 요청 시도",
     );
 
     const response = await fetch(
@@ -135,7 +174,7 @@ async function notifyUploadComplete(
     if (!response.ok) {
       log.error(
         { status: response.status, statusText: response.statusText },
-        "[upload complete] control plane으로 업로드 성공 요청 전송 실패",
+        "[UPLOAD COMPLETE] control plane으로 업로드 성공 요청 전송 실패",
       );
       throw new Error(
         `Upload complete failed: ${response.status} ${response.statusText}`,
@@ -147,27 +186,19 @@ async function notifyUploadComplete(
       "[upload complete] control plane으로 업로드 정보 전송 완료",
     );
   } catch (error: unknown) {
-  // TODO: Retry 로 실패 문제 해결하기
-    if (error instanceof Error) {
-      log.error(
-        {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          bucket: uploadInfo.bucket,
-          objectKey: uploadInfo.objectKey,
-        },
-        "[upload complete] 실패 : control plane으로 업로드 실패",
-      );
-    } else {
-      log.error(
-        {
-          error,
-          bucket: uploadInfo.bucket,
-          objectKey: uploadInfo.objectKey,
-        },
-        "[upload complete] 알수없는 에러 ",
-      );
-    }
+    // TODO : 재시도 로직 필요
+
+    log.error(
+      error instanceof Error
+        ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+          }
+        : { error },
+      "[upload complete] control plane 호출 실패",
+    );
+
+    throw error;
   }
 }
