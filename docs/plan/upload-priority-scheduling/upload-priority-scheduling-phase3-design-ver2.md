@@ -73,6 +73,8 @@ Phase 3는 running 집합에 대해 짧은 주기로 재할당을 수행한다.
 - A가 가장 큰 추가 분배를 받음
 - 총합은 상한을 넘지 않음
 
+
+
 ---
 
 ## 5. 컴포넌트 책임
@@ -275,3 +277,104 @@ Phase 3는 다음 규칙으로 확정한다.
 2. UploadScheduler reallocation loop 연결
 3. getCurrentAllocatedRateBps 경로 연결
 4. 단위/통합/성능 테스트 추가
+
+
+---
+# 요구사항
+
+>> 코드 명시적으로 변경하기
+```ts
+startReallocationLoop() {
+  if (reallocRunning) return
+  reallocRunning = true
+  timer = setInterval(() => {
+    if (!reallocRunning) return
+
+    const running = snapshotRunningJobs()
+    if (running.length === 0) return
+
+    const result = allocator.allocate({
+      runningJobs: running.map(j => ({ jobId: j.jobId, score: j.score })),
+      globalIngressLimitBps: config.globalIngressLimitBps,
+      minRatePerJobBps: config.minRatePerJobBps,
+    })
+
+    for (const [jobId, rate] of result.byJobId) {
+      const job = runningJobs.get(jobId)
+      if (job) job.allocatedRateBps = rate
+    }
+  }, config.reallocationIntervalMs)
+}
+```
+위 코드에서 
+const job = runningJobs.get(jobId)
+if (job) job.allocatedRateBps = rate
+부분의 job이 복사본인지 원본인지 코드만 보고 확신이 안돼. 물론 참조값이니 같이 변경되겠지만, 코드만 읽어도 명확하게 알 수 있도록 수정이 필요해.
+해당 코드 부분을 별도로 추출해서, 메서드 이름으로 의도를 알 수 있게 만들어.
+다음 예시처럼.
+```ts
+for (const [jobId, rate] of result.byJobId) {
+  updateJobRate(jobId, rate)
+}
+
+function updateJobRate(jobId: string, rate: number) {
+  const job = runningJobs.get(jobId)
+  if (!job) return
+
+  job.allocatedRateBps = rate
+}
+```
+
+>> 정수화 및 잔여 보정 로직
+
+```ts
+allocate(input) {
+  const n = input.runningJobs.length
+  if (n === 0) return emptyResult()
+
+  const baseTotal = n * input.minRatePerJobBps
+  if (baseTotal > input.globalIngressLimitBps) {
+    throw ConfigError("minRate 합이 global 상한 초과")
+  }
+
+  const remaining = input.globalIngressLimitBps - baseTotal
+  const scoreSum = sum(max(1, job.score) for job in input.runningJobs)
+
+  const map = new Map()
+  let used = 0
+
+  for (job of input.runningJobs) {
+    const normalizedScore = max(1, job.score)
+    const extraFloat = remaining * (normalizedScore / scoreSum)
+    const extra = floor(extraFloat)
+    const rate = input.minRatePerJobBps + extra
+    map.set(job.jobId, rate)
+    used += rate
+  }
+
+  let residue = input.globalIngressLimitBps - used
+  const sorted = sortByScoreDesc(input.runningJobs)
+  let i = 0
+  while (residue > 0) {
+    const target = sorted[i % sorted.length]
+    map.set(target.jobId, map.get(target.jobId) + 1)
+    residue -= 1
+    i += 1
+  }
+
+  return { byJobId: map, totalAllocatedBps: input.globalIngressLimitBps }
+}
+```
+
+해당 로직(residue 관련 부분)에서 연산이 여러번 필요할 수 있을 것 같아.처음에 O(n)으로 읽고, 잔여 보정하기 위해서 다시 위에서부터 O(n)으로 읽게 되는 것 같아.
+따라서 해당 연산이 반드시 필요한게 아니라면 굳이 추가하지 않아도 괜찮을 것 같다고 생각이 들어.
+추후에 CPU 사용량을 직접 확인하고, 상황에 따라서 추가하거나 뺄 수 있도록 만들어줘.
+
+>> 구현 전 확인 필요사항 10.1
+어차피 TCP 혼잡제어 때문에, rate 비율이 갑자기 증가해도 큰 변화가 없다고 생각해. 오히려 rate 비율이 갑자기 증가하면 그만큼 리소스를 차지하기 때문에, TCP 속도는 안나오는데 rate만 차지해버리는 리소스 낭비가 발생한다고 생각해. rate가 갑자기 크게 감소하는 경우도 마찬가지야. B안을 선택해서 rate가 안정적으로 변화하도록 구현해
+
+>> 10.2 
+굳이 job id별로 메트릭 수집하기 위해서 라벨링 할필요는 없어. B안으로 진행해
+
+>> 10.3 
+A안으로 진행해.
