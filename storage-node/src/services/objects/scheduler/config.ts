@@ -6,7 +6,7 @@ const DEFAULTS: SchedulerConfig = {
   maxQueuedBytes: 10 * 1024 * 1024 * 1024,
   maxRunningJobs: 100,
   queueTimeoutMs: 30_000,
-  globalIngressLimitBps: 20 * 1024 * 1024,
+  globalIngressLimitBps: 70 * 1024 * 1024,
   minRatePerJobBps: 256 * 1024,
   reallocationIntervalMs: 250,
   enableResidueRebalance: true,
@@ -14,6 +14,8 @@ const DEFAULTS: SchedulerConfig = {
   rateStepDownBps: 512 * 1024,
   reallocationErrorThreshold: 10,
   tokenBucketCapacityBytes: 512 * 1024,
+  rateLookupIntervalMs: 250,
+  refillPumpIntervalMs: 25,
   transformBufferLimitBytes: 1024 * 1024,
   waitBonusWindowMs: 5_000,
   maxWaitBonus: 20,
@@ -38,6 +40,14 @@ function validateSchedulerConfig(config: SchedulerConfig): SchedulerConfig {
 
   if (config.rateStepUpBps <= 0 || config.rateStepDownBps <= 0) {
     throw new Error("rateStepUpBps, rateStepDownBps 는 1 이상이어야 합니다.");
+  }
+
+  if (config.refillPumpIntervalMs <= 0 || config.rateLookupIntervalMs <= 0) {
+    throw new Error("refillPumpIntervalMs, rateLookupIntervalMs 는 1 이상이어야 합니다.");
+  }
+
+  if (config.refillPumpIntervalMs < 10) {
+    throw new Error("refillPumpIntervalMs 는 10ms 이상을 권장합니다.");
   }
 
   return config;
@@ -94,6 +104,14 @@ export function loadSchedulerConfig(
     tokenBucketCapacityBytes: parsePositiveInt(
       env.UPLOAD_SCHEDULER_TOKEN_BUCKET_CAPACITY_BYTES,
       DEFAULTS.tokenBucketCapacityBytes,
+    ),
+    rateLookupIntervalMs: parsePositiveInt(
+      env.UPLOAD_SCHEDULER_RATE_LOOKUP_INTERVAL_MS,
+      DEFAULTS.rateLookupIntervalMs,
+    ),
+    refillPumpIntervalMs: parsePositiveInt(
+      env.UPLOAD_SCHEDULER_REFILL_PUMP_INTERVAL_MS,
+      DEFAULTS.refillPumpIntervalMs,
     ),
     transformBufferLimitBytes: parsePositiveInt(
       env.UPLOAD_SCHEDULER_TRANSFORM_BUFFER_LIMIT_BYTES,
