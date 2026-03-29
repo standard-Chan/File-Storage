@@ -5,7 +5,7 @@ import {
 } from "../services/response/apiResponse";
 import { HttpError } from "../utils/HttpError";
 import { downloadFile, uploadFile } from "../services/objects/objectService";
-import { UploadLimiter } from "../services/objects/UploadLimiter";
+// import { UploadLimiter } from "../services/objects/UploadLimiter";
 
 export interface PresignedQuery {
   bucket: string;
@@ -22,7 +22,7 @@ interface ObjectParams {
 }
 
 const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  const uploadLimiter = UploadLimiter.getInstance();
+  // const uploadLimiter = UploadLimiter.getInstance();
 
   fastify.addContentTypeParser("*", function (_request, payload, done) {
     done(null, payload);
@@ -74,15 +74,15 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     Params: ObjectParams;
     Querystring: PresignedQuery;
   }>("/objects/direct/:bucket/*", async function (request, reply) {
-    const fileSize = Number(request.query.fileSize);
-    const acquired = uploadLimiter.tryAcquire(fileSize, request);
+    // const fileSize = Number(request.query.fileSize);
+    // const acquired = uploadLimiter.tryAcquire(fileSize, request);
 
-    if (!fileSize || !acquired) {
-      request.log.warn(`[Upload Limiter] 업로드 요청이 과도하게 발생하였습니다`);
-      return reply.code(429).send({
-        message: "현재 과도한 업로드 요청으로 인해 처리할 수 없습니다",
-      });
-    }
+    // if (!fileSize || !acquired) {
+    //   request.log.warn(`[Upload Limiter] 업로드 요청이 과도하게 발생하였습니다`);
+    //   return reply.code(429).send({
+    //     message: "현재 과도한 업로드 요청으로 인해 처리할 수 없습니다",
+    //   });
+    // }
 
     try {
       const fileInfo = await uploadFile(request, fastify.replicationQueue);
@@ -109,9 +109,10 @@ const objects: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           error: error instanceof Error ? error.message : "알 수 없는 오류",
         },
       );
-    } finally {
-      uploadLimiter.release(fileSize);
-    }
+    } 
+    // finally {
+    //   // uploadLimiter.release(fileSize);
+    // }
   });
 };
 
