@@ -85,8 +85,7 @@ export class PriorityQueue {
     }
   }
 
-  // TODO : job과 너무 강하게 묶여있다. 
-  // 추후 이를 분리하여 재사용 가능한 priority queue를 만들 필요가 있겠다.
+  // TODO : job과 너무 강하게 묶여있다. 범용성 있는 priority queue를 별도로 만들자.
   private compare(jobA: UploadJob, jobB: UploadJob): number {
     if (jobA.score !== jobB.score) {
       return jobB.score - jobA.score;

@@ -93,9 +93,9 @@ export class UploadScheduler {
     return Math.max(this.config.minRatePerJobBps, job.allocatedRateBps);
   }
 
-   /**
+  /**
    * 작업을 큐에 추가하고 실행 허가 Promise 반환
-   * 사용 방식 
+   * 사용 방식
    * await scheduler.enqueue(jobInput);
    * 이후 resolve 될때까지 await로 대기한다.
    */
@@ -103,7 +103,10 @@ export class UploadScheduler {
     if (!this.started) {
       throw new Error("UploadScheduler가 시작되지 않았습니다.");
     }
-    if (this.runningJobs.has(jobInput.jobId) || this.waitingTickets.has(jobInput.jobId)) {
+    if (
+      this.runningJobs.has(jobInput.jobId) ||
+      this.waitingTickets.has(jobInput.jobId)
+    ) {
       throw new Error(`중복 jobId 입니다: ${jobInput.jobId}`);
     }
     if (!Number.isFinite(jobInput.fileSize) || jobInput.fileSize <= 0) {
@@ -207,7 +210,6 @@ export class UploadScheduler {
     void this.runDispatch();
   }
 
-
   private async runDispatch(): Promise<void> {
     this.isDispatching = true;
     try {
@@ -275,7 +277,7 @@ export class UploadScheduler {
     }
   }
 
-  /** 
+  /**
    * 대기 중인 작업들의 score 재계산 후 heap 재정렬
    */
   private refreshQueuedScores(now: number): void {
@@ -285,7 +287,11 @@ export class UploadScheduler {
     }
 
     for (const job of jobs) {
-      const score = this.scorePolicy.calculate(job.fileSize, job.enqueuedAt, now);
+      const score = this.scorePolicy.calculate(
+        job.fileSize,
+        job.enqueuedAt,
+        now,
+      );
       job.score = score.score;
     }
 
@@ -308,9 +314,12 @@ export class UploadScheduler {
     const running = [...this.runningJobs.values()].map((job) => ({
       jobId: job.jobId,
       score: Math.max(1, job.score),
-      previousAllocatedRateBps: Math.max(this.config.minRatePerJobBps, job.allocatedRateBps),
-      fileSize: job.fileSize,                           // 추가: score 재계산용
-      startedAt: job.startedAt ?? Date.now(),           // 추가: score 재계산용 (fallback to now)
+      previousAllocatedRateBps: Math.max(
+        this.config.minRatePerJobBps,
+        job.allocatedRateBps,
+      ),
+      fileSize: job.fileSize, 
+      startedAt: job.startedAt ?? Date.now(),
     }));
     if (running.length === 0) {
       this.consecutiveReallocationErrors = 0;
@@ -326,7 +335,10 @@ export class UploadScheduler {
     } catch (error) {
       this.consecutiveReallocationErrors += 1;
 
-      if (this.consecutiveReallocationErrors >= this.config.reallocationErrorThreshold) {
+      if (
+        this.consecutiveReallocationErrors >=
+        this.config.reallocationErrorThreshold
+      ) {
         console.error("[UploadScheduler] reallocation 연속 실패", {
           consecutiveFailures: this.consecutiveReallocationErrors,
           error,
@@ -334,10 +346,13 @@ export class UploadScheduler {
         return;
       }
 
-      console.warn("[UploadScheduler] reallocation 실패. 이전 rate를 유지합니다.", {
-        consecutiveFailures: this.consecutiveReallocationErrors,
-        error,
-      });
+      console.warn(
+        "[UploadScheduler] reallocation 실패. 이전 rate를 유지합니다.",
+        {
+          consecutiveFailures: this.consecutiveReallocationErrors,
+          error,
+        },
+      );
     }
   }
 
@@ -353,5 +368,9 @@ export class UploadScheduler {
     if (!runningJob) return;
 
     runningJob.allocatedRateBps = Math.max(this.config.minRatePerJobBps, rate);
+  }
+
+  private getQueuedBytes(): number {
+    return this.queue.snapshot().reduce((sum, job) => sum + job.fileSize, 0);
   }
 }
