@@ -18,7 +18,6 @@ const DEFAULTS: SchedulerConfig = {
   rateLookupIntervalMs: 500,
   refillPumpIntervalMs: 25,
   transformBufferLimitBytes: 1 * MB,
-  waitBonusWindowMs: 5_000,
   maxWaitBonus: 20,
   maxSizePriority: 100,
 };
@@ -117,10 +116,6 @@ export function loadSchedulerConfig(
     transformBufferLimitBytes: parsePositiveInt(
       env.UPLOAD_SCHEDULER_TRANSFORM_BUFFER_LIMIT_BYTES,
       DEFAULTS.transformBufferLimitBytes,
-    ),
-    waitBonusWindowMs: parsePositiveInt(
-      env.UPLOAD_SCHEDULER_WAIT_BONUS_WINDOW_MS,
-      DEFAULTS.waitBonusWindowMs,
     ),
     maxWaitBonus: parseNonNegativeInt(
       env.UPLOAD_SCHEDULER_MAX_WAIT_BONUS,

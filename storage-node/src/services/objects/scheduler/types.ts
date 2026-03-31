@@ -29,7 +29,6 @@ export interface SchedulerConfig {
   rateLookupIntervalMs: number;  // 각 jobs의 rate 반영 주기
   refillPumpIntervalMs: number;  // 각 stream의 토큰 갱신 주기
   transformBufferLimitBytes: number;
-  waitBonusWindowMs: number;
   maxWaitBonus: number;
   maxSizePriority: number;
 }

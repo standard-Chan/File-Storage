@@ -1,5 +1,5 @@
 import { loadSchedulerConfig } from "./config";
-import { SizeAndWaitScorePolicy } from "./ScorePolicy";
+import { SizeAndWaitScorePolicy } from "./scorePolicy/ScorePolicy";
 import { UploadScheduler } from "./UploadScheduler";
 
 /**
@@ -12,7 +12,6 @@ export function getOrCreateUploadScheduler(): UploadScheduler {
     const config = loadSchedulerConfig();
     const scorePolicy = new SizeAndWaitScorePolicy({
       maxSizePriority: config.maxSizePriority,
-      waitBonusWindowMs: config.waitBonusWindowMs,
       maxWaitBonus: config.maxWaitBonus,
     });
 
