@@ -1,6 +1,6 @@
 import { PriorityQueue } from "./PriorityQueue";
 import { RateAllocator } from "./RateAllocator";
-import { ScorePolicy } from "./ScorePolicy";
+import { ScorePolicy } from "./scorePolicy/ScorePolicy";
 import {
   AdmissionGrant,
   AdmissionTicket,
@@ -29,13 +29,16 @@ export class UploadScheduler {
     this.config = config;
     this.scorePolicy = scorePolicy;
     this.queue = new PriorityQueue(config.maxQueuedJobs);
-    this.rateAllocator = new RateAllocator({
-      globalIngressLimitBps: config.globalIngressLimitBps,
-      minRatePerJobBps: config.minRatePerJobBps,
-      enableResidueRebalance: config.enableResidueRebalance,
-      rateStepUpBps: config.rateStepUpBps,
-      rateStepDownBps: config.rateStepDownBps,
-    });
+    this.rateAllocator = new RateAllocator(
+      {
+        globalIngressLimitBps: config.globalIngressLimitBps,
+        minRatePerJobBps: config.minRatePerJobBps,
+        enableResidueRebalance: config.enableResidueRebalance,
+        rateStepUpBps: config.rateStepUpBps,
+        rateStepDownBps: config.rateStepDownBps,
+      },
+      scorePolicy, // scorePolicy 주입
+    );
   }
 
   static initialize(config: SchedulerConfig, scorePolicy: ScorePolicy): void {
@@ -301,11 +304,13 @@ export class UploadScheduler {
       return;
     }
 
-    // 실행 중인 job  snapshot 획득
+    // 실행 중인 job snapshot 획득
     const running = [...this.runningJobs.values()].map((job) => ({
       jobId: job.jobId,
       score: Math.max(1, job.score),
       previousAllocatedRateBps: Math.max(this.config.minRatePerJobBps, job.allocatedRateBps),
+      fileSize: job.fileSize,                           // 추가: score 재계산용
+      startedAt: job.startedAt ?? Date.now(),           // 추가: score 재계산용 (fallback to now)
     }));
     if (running.length === 0) {
       this.consecutiveReallocationErrors = 0;
@@ -313,7 +318,7 @@ export class UploadScheduler {
     }
 
     try {
-      // 대역폭 계산
+      // 대역폭 계산 (score 재계산 포함)
       const allocationResult = this.rateAllocator.allocate(running);
       // running 작업에 대역폭 할당
       this.applyAllocationResult(allocationResult.allocatedRateByJobIdMap);
@@ -348,9 +353,5 @@ export class UploadScheduler {
     if (!runningJob) return;
 
     runningJob.allocatedRateBps = Math.max(this.config.minRatePerJobBps, rate);
-  }
-
-  private getQueuedBytes(): number {
-    return this.queue.snapshot().reduce((sum, job) => sum + job.fileSize, 0);
   }
 }
