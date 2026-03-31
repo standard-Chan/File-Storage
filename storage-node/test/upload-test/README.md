@@ -118,6 +118,31 @@ k6 run --vus 20 --env BUCKET=my-bucket k6-load-test.js
 k6 run --out json=results.json k6-load-test.js
 ```
 
+#### VUs 매트릭스 자동 실행 (10,15,20,25,30,35,40)
+
+여러 VUs 케이스를 한 번에 실행하고 결과를 자동 집계합니다.
+
+```bash
+# 기본 실행 (VUs: 10,15,20,25,30,35,40 / duration: 1m)
+node run-k6-matrix.mjs
+
+# duration 변경
+node run-k6-matrix.mjs --duration 3m
+
+# VUs 목록 커스텀
+node run-k6-matrix.mjs --vus 10,20,30,40
+
+# 버킷/Control Plane URL 지정
+node run-k6-matrix.mjs --bucket bucket1 --control-plane-url http://localhost:8080
+```
+
+실행 결과는 `results/vus-matrix-YYYYMMDD-HHMMSS/`에 저장됩니다.
+
+- `summary-vus-XX.json`: 각 VUs 실행별 원본 summary
+- `aggregate.json`: 전체 집계 데이터(JSON)
+- `aggregate.csv`: 엑셀/시트 확인용 CSV
+- `aggregate.md`: 사람이 읽기 쉬운 요약 표
+
 **특징:**
 - 1KB, 10KB, 100KB, 1MB, 10MB 파일 크기 랜덤 선택
 - Presigned URL 발급부터 파일 업로드까지 전체 시나리오 테스트
