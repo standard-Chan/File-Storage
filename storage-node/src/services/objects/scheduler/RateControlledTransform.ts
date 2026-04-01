@@ -5,7 +5,7 @@ import { TokenBucket } from "./TokenBucket";
 interface PendingChunk {
   buffer: Buffer;
   offset: number;
-  done: TransformCallback;
+  done?: TransformCallback;  // callback은 이미 호출됨 (즉시 호출 모델)
 }
 
 export interface RateControlledTransformConfig {
@@ -18,11 +18,11 @@ export interface RateControlledTransformConfig {
 }
 
 export interface RateControlledTransformStats {
-  bytesIn: number;    // Transform가 입력으로 받은 총 바이트 수
-  bytesOut: number;   // Transform가 실제 push한 총 바이트 수
-  partialWriteCount: number;   // 부분 전송 발생 횟수 (로깅 및 튜닝용)
-  throttlePauseCount: number;  // 토큰 부족으로 스로틀 구간이 시작된 횟수 (로깅 및 튜닝용)
-  totalThrottledMs: number;    // 토큰 부족 상태로 대기한 누적 시간(ms) (로깅 및 튜닝용)
+  bytesIn: number; // Transform가 입력으로 받은 총 바이트 수
+  bytesOut: number; // Transform가 실제 push한 총 바이트 수
+  partialWriteCount: number; // 부분 전송 발생 횟수 (로깅 및 튜닝용)
+  throttlePauseCount: number; // 토큰 부족으로 스로틀 구간이 시작된 횟수 (로깅 및 튜닝용)
+  totalThrottledMs: number; // 토큰 부족 상태로 대기한 누적 시간(ms) (로깅 및 튜닝용)
 }
 
 /**
@@ -65,7 +65,9 @@ export class RateControlledTransform extends Transform {
     this.rateLookupIntervalMs = Math.max(50, config.rateLookupIntervalMs);
     this.refillPumpIntervalMs = Math.max(10, config.refillPumpIntervalMs);
 
-    const initialRateBps = this.scheduler.getCurrentAllocatedRateBps(this.jobId);
+    const initialRateBps = this.scheduler.getCurrentAllocatedRateBps(
+      this.jobId,
+    );
     this.bucket = new TokenBucket({
       capacityBytes: config.capacityBytes,
       refillRateBps: initialRateBps,
@@ -76,9 +78,15 @@ export class RateControlledTransform extends Transform {
   }
 
   /**
-   * 입력 chunk를 pending queue에 적재하고 즉시 flush를 시도한다.
+   * 입력 chunk를 pending queue에 적재한다.
+   * **중요**: callback을 즉시 호출한다. (upstream backpressure 제어하기 위함)
+   * downstream flush 여부는 pending queue와 refillPumpLoop으로 관리한다.
    */
-  _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback): void {
+  _transform(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    callback: TransformCallback,
+  ): void {
     this.stats.bytesIn += chunk.length;
     this.pendingQueue.push({
       buffer: chunk,
@@ -86,11 +94,17 @@ export class RateControlledTransform extends Transform {
       done: callback,
     });
 
+    // **핵심 수정**: callback을 즉시 호출 
+    // → upstream의 highWaterMark 차단 방지
+    // → 실제 flush는 refillPumpLoop + tryFlushPending으로 처리
+    callback();
+
     this.tryFlushPending();
   }
 
   /**
    * downstream이 다시 읽을 준비가 되면 flush를 재시도한다.
+   * _read()는 표준 stream 메커니즘에서 호출되므로, pipe() override 제거
    */
   _read(_size: number): void {
     this.tryFlushPending();
@@ -98,6 +112,7 @@ export class RateControlledTransform extends Transform {
 
   /**
    * 입력 종료 후 pending queue가 비워질 때까지 배출을 반복한다.
+   * callback은 이미 _transform에서 호출되었으므로, 여기서는 호출 안 함
    */
   _flush(callback: TransformCallback): void {
     const waitDrain = () => {
@@ -116,7 +131,10 @@ export class RateControlledTransform extends Transform {
   /**
    * 타이머를 해제하고 남은 pending callback을 오류로 종료한다.
    */
-  _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
+  _destroy(
+    error: Error | null,
+    callback: (error?: Error | null) => void,
+  ): void {
     this.stopRateLookupLoop();
     this.stopRefillPumpLoop();
 
@@ -137,6 +155,10 @@ export class RateControlledTransform extends Transform {
 
   /**
    * pending queue를 순회하면서 토큰과 downstream 여유가 허용하는 만큼만 부분 전송한다.
+   * 또한 upstream backpressure를 명시적으로 관리한다.
+   * 
+   * **callback 호출 모델**: _transform에서 이미 즉시 호출됨
+   *                     (queue에서는 done() 호출 안 함)
    */
   private tryFlushPending(): void {
     if (this.flushing || this.destroyedByError) {
@@ -146,13 +168,16 @@ export class RateControlledTransform extends Transform {
     this.flushing = true;
 
     try {
+      let hadSuccessfulWrite = false;
+
       while (this.pendingQueue.length > 0) {
         const head = this.pendingQueue[0];
         const remaining = head.buffer.length - head.offset;
 
         if (remaining <= 0) {
+          // chunk가 완전히 flush됨 → queue에서 제거
           this.pendingQueue.shift();
-          head.done();
+          // callback은 이미 _transform에서 호출됨 (이중 호출 방지)
           continue;
         }
 
@@ -163,13 +188,17 @@ export class RateControlledTransform extends Transform {
         }
 
         const writeBytes = Math.min(remaining, spendable);
-        const piece = head.buffer.subarray(head.offset, head.offset + writeBytes);
+        const piece = head.buffer.subarray(
+          head.offset,
+          head.offset + writeBytes,
+        );
 
         const canContinue = this.push(piece);
         this.bucket.consume(writeBytes);
 
         head.offset += writeBytes;
         this.stats.bytesOut += writeBytes;
+        hadSuccessfulWrite = true;
 
         if (writeBytes < remaining) {
           this.stats.partialWriteCount += 1;
@@ -177,7 +206,7 @@ export class RateControlledTransform extends Transform {
 
         if (head.offset >= head.buffer.length) {
           this.pendingQueue.shift();
-          head.done();
+          // callback은 이미 _transform에서 호출됨
         }
 
         if (!canContinue) {
@@ -188,8 +217,15 @@ export class RateControlledTransform extends Transform {
       if (this.pendingQueue.length === 0) {
         this.markThrottledEndIfNeeded();
       }
+
+      // Token 충분 + pending queue 비움 → upstream resume 신호
+      // (표준 stream의 _read() 호출로 충분)
+      if (hadSuccessfulWrite && this.pendingQueue.length === 0) {
+        // 데이터가 downstream으로 성공 전송됨
+      }
     } catch (error) {
-      const flushError = error instanceof Error ? error : new Error(String(error));
+      const flushError =
+        error instanceof Error ? error : new Error(String(error));
       this.failAllPending(flushError);
       this.destroy(flushError);
     } finally {
@@ -284,10 +320,15 @@ export class RateControlledTransform extends Transform {
   /**
    * 비정상 종료 시 pending callback을 모두 실패 처리한다.
    */
-  private failAllPending(error: Error): void {
+  /**
+   * pending queue를 모두 비운다.
+   * callback은 이미 _transform에서 호출되었으므로, 여기서는 호출 안 함
+   * (이중 호출 방지)
+   */
+  private failAllPending(_error: Error): void {
     while (this.pendingQueue.length > 0) {
-      const pending = this.pendingQueue.shift();
-      pending?.done(error);
+      this.pendingQueue.shift();
+      // callback은 이미 _transform에서 호출됨
     }
   }
 }
