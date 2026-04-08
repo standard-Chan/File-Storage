@@ -38,7 +38,11 @@ public class StorageNodeDiskService {
     }
 
     /**
-     * 업로드를 위한 최적의 노드 선택 1. 모든 노드의 디스크 상태 조회 2. 파일 크기(Bytes)를 수용 가능한 노드 필터링 3. 남은 용량이 가장 큰 노드 반환
+     * 업로드를 위한 최적의 노드 선택
+     *
+     * @ 1. 모든 노드의 디스크 상태 조회
+     * @ 2. 파일 크기(Bytes)를 수용 가능한 노드 필터링
+     * @ 3. 남은 용량이 가장 큰 노드 반환
      */
     public StorageNodeDiskInfo selectOptimalNodeForUpload(long fileSize) {
         List<StorageNodeDiskInfo> diskInfos = getAllStorageNodesDiskUsage();
@@ -67,7 +71,6 @@ public class StorageNodeDiskService {
                 CompletableFuture.supplyAsync(() -> queryDiskUsageToStorageNode(nodeIp.trim())))
             .toList();
 
-        // 모든 응답 대기
         return futures.stream().map(future -> {
             try {
                 return future.orTimeout(diskQueryTimeoutMs, TimeUnit.MILLISECONDS).join();
@@ -79,7 +82,7 @@ public class StorageNodeDiskService {
     }
 
     /**
-     * Storage Node IP 목록 유효성 검증 - IP가 하나도 설정되지 않았거나, 형식이 잘못된 경우 false 반환
+     * 환경 변수에 등록된 node ip 들을 반환
      */
     private List<String> getValidNodeIps() {
         if (storageNodeIpsString == null || storageNodeIpsString.isBlank()) {

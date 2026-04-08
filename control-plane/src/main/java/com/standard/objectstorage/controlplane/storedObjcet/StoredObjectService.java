@@ -32,7 +32,7 @@ public class StoredObjectService {
 
         Bucket bucket = bucketRepository.findByName(request.getBucket())
             .orElseThrow(() -> new EntityNotFoundException(
-                "Bucket not found: " + request.getBucket()));
+                "[Bucket] 버킷이 존재하지 않습니다 : " + request.getBucket()));
 
         StoredObject storedObject = StoredObject.builder()
             .bucket(bucket)
