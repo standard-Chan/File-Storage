@@ -1,6 +1,6 @@
 {
   "name": "storage-node",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "This project was bootstrapped with Fastify-CLI.",
   "main": "app.ts",
   "directories": {
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.8",
     "c8": "^10.1.2",
     "concurrently": "^9.0.0",
@@ -41,6 +42,7 @@
     "fastify-tsconfig": "^3.0.0",
     "nodemon": "^3.1.14",
     "pino-pretty": "^13.1.3",
+    "ts-jest": "^29.4.9",
     "ts-node": "^10.4.0",
     "typescript": "~5.9.2"
   }
