@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── 설정 ──────────────────────────────────────────────────────────────────
-const STORAGE_NODE_URL = process.env.STORAGE_NODE_URL ?? "http://localhost:3000";
+const STORAGE_NODE_URL = process.env.STORAGE_NODE_URL ?? "http://standard-storage.duckdns.org:3000";
 const BUCKET = process.env.BUCKET ?? "multipart-test-bucket";
 const TEST_FILES_DIR = path.join(__dirname, "test-files");
 const DEFAULT_PART_SIZE_MB = 5;

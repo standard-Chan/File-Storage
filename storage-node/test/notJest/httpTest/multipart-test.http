@@ -1,4 +1,5 @@
-@storageNodeUrl = http://localhost:3000
+# @storageNodeUrl = http://localhost:3000
+@storageNodeUrl = http://standard-storage.duckdns.org:3000
 
 ###############################################
 ### Multipart Upload 테스트

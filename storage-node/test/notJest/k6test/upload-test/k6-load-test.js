@@ -12,8 +12,8 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
  *  --vus = 인원수
  *  --duration 지속 시간
  *  --out experimental-prometheus-rw=http://localhost:9090/api/v1/write : 프로메테우스로 전달 
- *   k6 run --vus 50 --duration 3m k6-load-test.js
- * k6 run --vus 1 --duration 3m k6-load-test.js
+ *   k6 run --vus 35 --duration 3m k6-load-test.js
+ * k6 run --vus 1 --duration 10s k6-load-test.js
  *   k6 run --vus 100 --duration 1m --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
  *   k6 run --vus 100 --duration 2m --env BUCKET=my-bucket k6-load-test.js
  * k6 run --vus 1000 --duration 10s --out experimental-prometheus-rw=http://localhost:9090/api/v1/write k6-load-test.js
@@ -33,11 +33,12 @@ const BUCKET = __ENV.BUCKET || 'bucket1';
 // init context에서 로드되어 모든 VU가 공유 (메모리 효율적)
 const FILE_SIZES = [
   { label: '1MB', size: 1 * 1024 * 1024, data: open('./test-files/1MB.bin', 'b') },
+  { label: '5MB', size: 5 * 1024 * 1024, data: open('./test-files/5MB.bin', 'b') },
   { label: '10MB', size: 10 * 1024 * 1024, data: open('./test-files/10MB.bin', 'b') },
   { label: '50MB', size: 50 * 1024 * 1024, data: open('./test-files/50MB.bin', 'b') },
   { label: '100MB', size: 100 * 1024 * 1024, data: open('./test-files/100MB.bin', 'b') },
-  // { label: '500MB', size: 500 * 1024 * 1024, data: open('./test-files/500MB.bin', 'b') },
-  // { label: '1GB', size: 1 * 1024 * 1024 * 1024, data: open('./test-files/1GB.bin', 'b') },
+  { label: '500MB', size: 500 * 1024 * 1024, data: open('./test-files/500MB.bin', 'b') },
+  { label: '1GB', size: 1 * 1024 * 1024 * 1024, data: open('./test-files/1GB.bin', 'b') },
 ];
 
 const uploadFileDuration = new Trend('upload_file_duration', true);
@@ -132,7 +133,7 @@ function uploadFile(presignedUrl, fileData, _fileName, fileSize) {
         name: 'upload_file',
         file_size: sizeLabel,
       },
-      timeout: '60s', // 큰 파일 업로드를 위한 타임아웃
+      timeout: '300s', // 큰 파일 업로드를 위한 타임아웃
     }
   );
 

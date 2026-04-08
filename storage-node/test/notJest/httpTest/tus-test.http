@@ -1,0 +1,37 @@
+@storageNodeUrl = http://localhost:8080
+
+
+### 1. 업로드 Presigned URL 생성
+# @name createSession
+POST {{storageNodeUrl}}/api/storage/presigned-url
+Content-Type: application/json
+
+{
+  "bucket": "test_bucket",
+  "objectKey": "a/ok.jpg",
+  "fileSize": 1073741826
+}
+
+### 2. 업로드 상태 확인 (현재 오프셋 조회)
+HEAD http://standard-object-storage.duckdns.org:3000/tus/objects/test_bucket/a/ok.jpg
+Tus-Resumable: 1.0.0
+
+### 3. 업로드 세션 생성 및 업로드 URL 얻기
+# URL 얻기
+POST http://standard-object-storage.duckdns.org:3000/objects/resumable/test_bucket/a/ok.jpg?bucket=test_bucket&objectKey=a/ok.jpg&method=POST&exp=1772681232&fileSize=1073741826&signature=IC0BMnQnZY3HzVnLzGLleWpoJgySZkwhxQut0BsfV0o
+Tus-Resumable: 1.0.0
+Upload-Length: 1073741826
+Upload-Metadata: filename d29ybGQuanBn,filetype aW1hZ2UvanBlZw==  
+Content-Length: 0 
+
+
+### 3. 파일 청크 전송 (10MB 전체를 한 번에 전송)
+# 위 요청 실행 후 응답 Location 헤더를 자동으로 사용합니다
+PATCH http://standard-object-storage.duckdns.org:3000/tus/objects/test_bucket/a/ok.jpg
+Content-Type: application/offset+octet-stream
+Tus-Resumable: 1.0.0
+Upload-Offset: 0
+Content-Length: 1073741826
+
+< ../upload-test/test-files/1GB.bin
+
