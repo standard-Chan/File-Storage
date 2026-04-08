@@ -1,21 +1,4 @@
-import { FastifyReply } from 'fastify'
 import { FileInfo } from '../storage/fileStorage'
-
-/**
- * 에러 응답 전송
- */
-export function sendErrorResponse(
-  reply: FastifyReply,
-  code: number,
-  message: string,
-  data?: any
-) {
-  return reply.code(code).send({
-    success: false,
-    message,
-    ...data
-  })
-}
 
 /**
  * 성공 응답 생성

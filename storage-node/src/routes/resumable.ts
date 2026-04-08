@@ -1,7 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { PresignedQuery } from "./objects";
 import { validatePresignedUrlRequest } from "../services/validation/presignedUrl";
-import { sendErrorResponse } from "../services/response/apiResponse";
 import { HttpError } from "../utils/HttpError";
 
 /**
@@ -25,25 +24,8 @@ const resumable: FastifyPluginAsync = async (fastify): Promise<void> => {
    */
   fastify.post<{ Querystring: PresignedQuery }>(
     "/objects/resumable/*",
-    (req, res) => {
-      try {
-        validatePresignedUrlRequest(req.query, "POST");
-      } catch (error) {
-        if (error instanceof HttpError) {
-          fastify.log.warn(
-            { error: error.message, statusCode: error.statusCode },
-            "[TUS] Presigned URL 검증 실패",
-          );
-          return sendErrorResponse(
-            res,
-            error.statusCode,
-            error.message,
-            error.data,
-          );
-        }
-        fastify.log.error({ error }, "[TUS] 검증 중 예상치 못한 오류");
-        return sendErrorResponse(res, 500, "검증 중 오류가 발생했습니다");
-      }
+    async (req, res) => {
+      validatePresignedUrlRequest(req.query, "POST");
 
       const { bucket, objectKey, exp } = req.query;
       const fileId = `${bucket}/${objectKey}`;
@@ -72,12 +54,12 @@ const resumable: FastifyPluginAsync = async (fastify): Promise<void> => {
 
       if (result === "not_found") {
         fastify.log.warn({ fileId }, "[TUS] 세션 없음 - 미인가 요청");
-        return sendErrorResponse(res, 404, "인가되지 않은 요청입니다. ");
+          throw new HttpError(404, "인가되지 않은 요청입니다. ");
       }
 
       if (result === "expired") {
         fastify.log.warn({ fileId }, "[TUS] 세션 만료");
-        return sendErrorResponse(res, 410, "업로드 세션이 만료되었습니다");
+          throw new HttpError(410, "업로드 세션이 만료되었습니다");
       }
     }
 
