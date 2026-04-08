@@ -7,7 +7,7 @@ import {
   stopReplicationWorker,
 } from "./services/replication/replicationWorker";
 import { NodeIpDetector } from "./utils/NodeIpDetector";
-import { HttpError } from "./utils/HttpError";
+import { handleGlobalError } from "./exception/globalErrorHandler";
 
 dotenv.config();
 export interface AppOptions
@@ -45,24 +45,7 @@ const app: FastifyPluginAsync<AppOptions> = async (
   });
 
   fastify.setErrorHandler((err, req, reply) => {
-    if (err instanceof HttpError) {
-      req.log.warn(
-        { error: err.message, statusCode: err.statusCode, data: err.data },
-        "Request validation failed",
-      );
-
-      return reply.status(err.statusCode).send({
-        success: false,
-        message: err.message,
-        ...(err.data ?? {}),
-      });
-    }
-
-    req.log.error(err);
-    return reply.status(500).send({
-      success: false,
-      message: "서버 내부 오류가 발생했습니다",
-    });
+    return handleGlobalError(err, req, reply);
   });
 
   // log
