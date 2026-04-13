@@ -1,6 +1,6 @@
 # File-Storage
 
-데이터를 저장하고 다운로드할 수 있는 File Storage를 직접 만드는 프로젝트입니다.
+데이터를 저장하고 다운로드할 수 있는 분산 File Storage 프로젝트입니다.
 
 ---
 
@@ -30,7 +30,7 @@
 - [부하테스트 및 서버 메모리 최적화를 통한 안정성 확보](https://velog.io/@standard-chan/storage-5-%EB%B6%80%ED%95%98-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EC%A4%91-%EC%84%9C%EB%B2%84%EA%B0%80-%ED%84%B0%EC%A1%8C%EB%8B%A4-%EC%9B%90%EC%9D%B8-%EB%B6%84%EC%84%9D%EA%B3%BC-%ED%95%B4%EA%B2%B0-%EB%B0%8F-%EC%82%BD%EC%A7%88-%EA%B8%B0%EB%A1%9D)
 
 ## 4. 인프라
-- [수평 확장 가능한 설계](https://velog.io/@standard-chan/storage-8-DISK%EA%B0%80-%EA%B0%80%EB%93%9D-%EC%B0%A8%EB%A9%B4-%EC%96%B4%EB%96%BB%EA%B2%8C%ED%95%98%EC%A7%80-%ED%99%95%EC%9E%A5%EC%84%B1-%EC%9E%88%EB%8A%94-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
+- [수평 확장 가능한 설계 구축](https://velog.io/@standard-chan/storage-8-DISK%EA%B0%80-%EA%B0%80%EB%93%9D-%EC%B0%A8%EB%A9%B4-%EC%96%B4%EB%96%BB%EA%B2%8C%ED%95%98%EC%A7%80-%ED%99%95%EC%9E%A5%EC%84%B1-%EC%9E%88%EB%8A%94-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
 
 ## 5. 기타 잡다한 기록
 - [테스트 환경 격리하기 - 로컬에서 VM으로 환경 이전](https://velog.io/@standard-chan/%EB%8F%84%EB%9E%80%EB%8F%84%EB%9E%80-%EC%9D%B4%EC%95%BC%EA%B8%B0-%ED%85%8C%EC%8A%A4%ED%8A%B8-%ED%99%98%EA%B2%BD-%EA%B2%A9%EB%A6%AC%ED%95%98%EA%B8%B0)

@@ -100,3 +100,8 @@ dist
 .svelte-kit
 
 .idea
+
+# k6test
+storage-node/test/notJest/k6test/upload-test/*.json
+storage-node/test/notJest/k6test/upload-test/
+storage-node/test/httpTest
