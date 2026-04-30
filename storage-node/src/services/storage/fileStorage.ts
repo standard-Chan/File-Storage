@@ -9,6 +9,8 @@ import crypto from 'crypto'
 import { HttpError } from '../../utils/HttpError'
 import { CONTENT_TYPE_MAP, DEFAULT_CONTENT_TYPE } from '../../constants/contentTypes'
 
+const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR ?? 'uploads'
+
 /* 현재 진행 중인 DISK 쓰기 작업 수 (pipeline 단위)*/
 let _activeDiskWrites = 0
 
@@ -96,7 +98,7 @@ export async function saveStreamToStorage(
   log: FastifyBaseLogger,
 ): Promise<string> {
 
-  const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
+  const filePath = path.join(process.cwd(), UPLOAD_BASE_DIR, bucket, objectKey)
   const fileDir = path.dirname(filePath)
 
   await fsPromises.mkdir(fileDir, { recursive: true })
@@ -184,7 +186,7 @@ export function getContentTypeFromExtension(objectKey: string): string {
  * 파일 읽기 스트림 생성
  */
 export function getFileStream(bucket: string, objectKey: string): fs.ReadStream {
-  const filePath = path.join(process.cwd(), 'uploads', bucket, objectKey)
+  const filePath = path.join(process.cwd(), UPLOAD_BASE_DIR, bucket, objectKey)
   
   // 파일 존재 여부 확인 (동기)
   if (!fs.existsSync(filePath)) {

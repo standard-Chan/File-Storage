@@ -3,13 +3,14 @@ import fs from "fs";
 import { NodeIpDetector } from "../utils/NodeIpDetector";
 import { DiskUsageResponse } from "../types/DiskUsageResponse";
 
+const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR ?? 'uploads'
+
 const diskRoute: FastifyPluginAsync = async (fastify, _opts): Promise<void> => {
   fastify.get<{ Reply: DiskUsageResponse }>(
     "/disk/space",
     async (request, reply) => {
-      const uploadPath = "uploads"; // 명확하게 지정
 
-      const stats = fs.statfsSync(uploadPath);
+      const stats = fs.statfsSync(UPLOAD_BASE_DIR);
 
       const total = stats.blocks * stats.bsize;
       const free = stats.bfree * stats.bsize;

@@ -16,7 +16,10 @@ const replications: FastifyPluginAsync = async (fastify, opts): Promise<void> =>
     },
   );
 
-  /* PUT /internal/replications : 내부 데이터 복제용 */
+  /**
+   * PUT /internal/replications
+   * - 다른 스토리지 노드에서 전달된 복제 데이터를 저장한다.
+   */
   fastify.put<{
     Querystring: ReplicateQuery;
   }>("/internal/replications", async function (request, reply) {

@@ -5,7 +5,8 @@ import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { generateETag, collectStreamFileInfo, FileInfo } from './fileStorage'
 
-const MULTIPART_ROOT_DIR = path.join(process.cwd(), 'uploads', '.multipart')
+const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR ?? 'uploads'
+const MULTIPART_ROOT_DIR = path.join(process.cwd(), UPLOAD_BASE_DIR, '.multipart')
 
 export interface MultipartPartMeta {
   partNumber: number
@@ -97,7 +98,7 @@ export async function mergeMultipartParts(
   parts: MultipartPartMeta[],
   contentType: string,
 ): Promise<FileInfo> {
-  const finalPath = path.join(process.cwd(), 'uploads', bucket, objectKey)
+  const finalPath = path.join(process.cwd(), UPLOAD_BASE_DIR, bucket, objectKey)
   const tempFinalPath = `${finalPath}.multipart-tmp-${Date.now()}`
 
   await fsPromises.mkdir(path.dirname(finalPath), { recursive: true })

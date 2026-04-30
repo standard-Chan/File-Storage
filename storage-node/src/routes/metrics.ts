@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify'
 import client from 'prom-client'
-import { getActiveDiskReads, getActiveDiskWrites } from '../services/storage/fileStorage'
+import { getActiveDiskWrites } from '../services/storage/fileStorage'
 
 // 글로벌 레지스트리 생성
 const register = new client.Registry()
@@ -70,22 +70,14 @@ register.registerMetric(storageUsed)
 register.registerMetric(activeDiskWriteOps)
 
 const metricsRoute: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
-  // /metrics 엔드포인트 (Prometheus scrape)
+  /**
+   * GET /metrics
+   * - Prometheus scrape용 메트릭을 반환한다.
+   */
   fastify.get('/metrics', async (request, reply) => {
     activeDiskWriteOps.set(getActiveDiskWrites())
     reply.header('Content-Type', register.contentType)
     return register.metrics()
-  })
-
-  // /metrics/disk 엔드포인트 (DISK 트래픽 현황 JSON)
-  fastify.get('/metrics/disk', async (request, reply) => {
-    const writeActive = getActiveDiskWrites();
-    const readActive = getActiveDiskReads();
-    return {
-      activeDiskWrites: writeActive,
-      activeDiskReads: readActive,
-      timestamp: new Date().toISOString()
-    }
   })
 }
 

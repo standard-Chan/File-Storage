@@ -139,6 +139,7 @@ describe('uploadFile 실제 파일 업로드 테스트', () => {
 
   for (const fileCase of REAL_UPLOAD_CASES) {
     it(`[실제 업로드] ${fileCase.label} 파일이 실제로 저장되어야 함`, async () => {
+      // URL 검증 및 replication 복제, control plane 성공 전송은 제외
       const bucket = 'bucket1';
       const objectKey = `real-upload/${fileCase.label.toLowerCase()}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.bin`;
       const fileBuffer = await fs.readFile(fileCase.filePath);

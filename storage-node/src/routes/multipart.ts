@@ -16,6 +16,10 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
     done(null, payload);
   });
 
+  /**
+   * POST /multipart/initiate
+   * - 멀티파트 업로드 세션을 생성한다.
+   */
   fastify.post<{ Body: InitiateMultipartBody }>(
     "/multipart/initiate",
     async function (request, reply) {
@@ -29,6 +33,10 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
     },
   );
 
+  /**
+   * PUT /multipart/:uploadId/:partNumber
+   * - 개별 part를 업로드한다.
+   */
   fastify.put<{ Params: UploadPartParams }>(
     "/multipart/:uploadId/:partNumber",
     async function (request, reply) {
@@ -42,6 +50,10 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
     },
   );
 
+  /**
+   * POST /multipart/:uploadId/complete
+   * - 업로드된 part들을 병합하고 업로드를 완료한다.
+   */
   fastify.post<{ Params: MultipartParams }>(
     "/multipart/:uploadId/complete",
     async function (request, reply) {
@@ -63,6 +75,10 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
     },
   );
 
+  /**
+   * DELETE /multipart/:uploadId
+   * - 멀티파트 업로드 세션과 임시 파일을 정리한다.
+   */
   fastify.delete<{ Params: MultipartParams }>(
     "/multipart/:uploadId",
     async function (request, reply) {
