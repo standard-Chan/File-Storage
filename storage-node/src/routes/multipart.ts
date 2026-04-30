@@ -1,13 +1,12 @@
 import { FastifyPluginAsync } from "fastify";
-import {
-  createSuccessResponse,
-} from "../services/response/apiResponse";
+import { createSuccessResponse } from "../services/response/apiResponse";
 import {
   MultipartService,
   InitiateMultipartBody,
   MultipartParams,
   UploadPartParams,
 } from "../services/multipart/MultipartService";
+import { isReplicationEnabled } from "../services/validation/replication";
 
 const multipartService = MultipartService.getInstance();
 
@@ -23,7 +22,8 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
   fastify.post<{ Body: InitiateMultipartBody }>(
     "/multipart/initiate",
     async function (request, reply) {
-      const multipartInfo = await multipartService.initiateMultipartUpload(request);
+      const multipartInfo =
+        await multipartService.initiateMultipartUpload(request);
 
       return reply.code(201).send({
         success: true,
@@ -59,10 +59,12 @@ const multipart: FastifyPluginAsync = async (fastify): Promise<void> => {
     async function (request, reply) {
       const completed = await multipartService.completeMultipartUpload(request);
 
-      fastify.replicationQueue.registerReplicationTask(
-        completed.fileInfo.bucket,
-        completed.fileInfo.objectKey,
-      );
+      if (isReplicationEnabled()) {
+        fastify.replicationQueue.registerReplicationTask(
+          completed.fileInfo.bucket,
+          completed.fileInfo.objectKey,
+        );
+      }
 
       const response = createSuccessResponse(completed.fileInfo);
       return reply.code(200).send({

@@ -10,11 +10,9 @@ export function validateReplicationHeader(
   replicationHeader: string | string[] | undefined,
 ): void {
   if (!replicationHeader) {
-    throw new HttpError(
-      403,
-      "복제 요청이 거부되었습니다",
-      { reason: "X-Replication-Request 헤더가 필요합니다" },
-    );
+    throw new HttpError(403, "복제 요청이 거부되었습니다", {
+      reason: "X-Replication-Request 헤더가 필요합니다",
+    });
   }
 }
 
@@ -29,11 +27,9 @@ export function validateReplicationParams(
   objectKey: string | undefined,
 ): void {
   if (!bucket || !objectKey) {
-    throw new HttpError(
-      400,
-      "필수 파라미터가 누락되었습니다",
-      { required: ["bucket", "objectKey"] },
-    );
+    throw new HttpError(400, "필수 파라미터가 누락되었습니다", {
+      required: ["bucket", "objectKey"],
+    });
   }
 }
 
@@ -42,10 +38,21 @@ export function validateReplicationParams(
  * @param body 요청 바디
  * @throws {HttpError} 스트림이 아니면 400 에러
  */
-export function validateReplicationBodyStream(body: unknown): asserts body is Readable {
+export function validateReplicationBodyStream(
+  body: unknown,
+): asserts body is Readable {
   if (!body || typeof (body as Readable).pipe !== "function") {
     throw new HttpError(400, "파일 스트림이 전달되지 않았습니다");
   }
+}
+
+/**
+ * 복제 처리 여부
+ * 목적 : 다중화 처리를 ON OFF 하기 위함
+ */
+export function isReplicationEnabled(): boolean {
+  const value = process.env.REPLICATION_ENABLED;
+  return value?.toLowerCase() === "true";
 }
 
 /**

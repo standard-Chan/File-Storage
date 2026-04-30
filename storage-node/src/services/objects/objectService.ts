@@ -8,7 +8,10 @@ import {
   FileInfo,
 } from "../storage/fileStorage";
 import { DEFAULT_CONTENT_TYPE } from "../../constants/contentTypes";
-import { validateReplicationBodyStream } from "../validation/replication";
+import {
+  isReplicationEnabled,
+  validateReplicationBodyStream,
+} from "../validation/replication";
 import { ReplicationQueueRepository } from "../../repository/replicationQueue";
 import { PresignedQuery } from "../../routes/objects";
 import { NodeIpDetector } from "../../utils/NodeIpDetector";
@@ -107,10 +110,13 @@ export async function uploadFile(
   );
   request.log.info({ fileInfo }, "파일 업로드 성공");
 
-  replicationQueue.registerReplicationTask(bucket, objectKey);
-  request.log.info({ bucket, objectKey }, "replication_queue에 복제 등록 완료");
-
-  if (bucket == "TRUE") {
+  // 다중화 처리
+  if (isReplicationEnabled()) {
+    replicationQueue.registerReplicationTask(bucket, objectKey);
+    request.log.info(
+      { bucket, objectKey },
+      "replication_queue에 복제 등록 완료",
+    );
     notifyUploadComplete(
       {
         bucket,
@@ -123,7 +129,6 @@ export async function uploadFile(
       request.log,
     );
   }
-
   return fileInfo;
 }
 
