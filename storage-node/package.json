@@ -7,9 +7,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node --test -r ts-node/register \"test/**/*.ts\"",
-    "test:build": "npm run build && node --test \"dist/test/**/*.js\"",
-    "test:coverage": "npm run build && c8 node --test \"dist/test/**/*.js\"",
+    "test": "node --test -r ts-node/register $(find test -type f \\( -name '*.test.ts' -o -name '*.spec.ts' \\))",
+    "test:build": "npm run build && node --test $(find dist/test -type f \\( -name '*.test.js' -o -name '*.spec.js' \\))",
+    "test:coverage": "npm run build && c8 node --test $(find dist/test -type f \\( -name '*.test.js' -o -name '*.spec.js' \\))",
     "start": "npm run build:ts && cross-env LANG=ko_KR.UTF-8 NODE_OPTIONS=\"--no-warnings\" fastify start -l info dist/app.js | pino-pretty --colorize",
     "build": "tsc",
     "watch:ts": "tsc -w",
